@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "md-compare-ext",
     "publisher": "jpctx",
-    "version": "1.0.15",
+    "version": "1.0.18",
     "name": "Compare Markdown files",
     "description": "Comparison tool for Markdown files in preview mode",
     "public": false,
@@ -39,7 +39,7 @@
             "targets": [ "ms.vss-code-web.pr-tabs" ],
             "properties": {
                 "name": "Markdown Preview",
-                "uri": "dist/pr-markdown-preview.html"
+                "uri": "dist/PrMarkdownPreview/PrMarkdownPreview.html"
             }
         }
     ]
