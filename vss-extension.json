@@ -1,8 +1,8 @@
 {
     "manifestVersion": 1,
-    "id": "md-compare-ext",
+    "id": "pr-markdown-preview",
     "publisher": "jpctx",
-    "version": "1.0.18",
+    "version": "1.0.19",
     "name": "Compare Markdown files",
     "description": "Comparison tool for Markdown files in preview mode",
     "public": false,

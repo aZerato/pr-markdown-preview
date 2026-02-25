@@ -5,11 +5,11 @@
       "name": "Launch Firefox",
       "type": "firefox",
       "request": "launch",
-      "url": "https://localhost:3000/dist/pr-markdown-preview.html",
+      "url": "https://localhost:3000/dist/PrMarkdownPreview/PrMarkdownPreview.html",
       "reAttach": true,
       "pathMappings": [
         {
-          "url": "webpack://pr-markdown-preview/src",
+          "url": "webpack://PrMarkdownPreview/src",
           "path": "${workspaceFolder}/src"
         }
       ]
@@ -18,7 +18,7 @@
       "name": "Launch Chrome",
       "type": "chrome",
       "request": "launch",
-      "url": "https://localhost:3000/dist/pr-markdown-preview.html",
+      "url": "https://localhost:3000/dist/PrMarkdownPreview/PrMarkdownPreview.html",
       "webRoot": "${workspaceFolder}",
       "sourceMaps": true,
       "trace": true
@@ -27,7 +27,7 @@
       "name": "Attach to Chrome",
       "type": "chrome",
       "request": "attach",
-      "url": "https://localhost:3000/dist/pr-markdown-preview.html",
+      "url": "https://localhost:3000/dist/PrMarkdownPreview/PrMarkdownPreview.html",
       "webRoot": "${workspaceFolder}",
       "sourceMaps": true,
       "trace": true
