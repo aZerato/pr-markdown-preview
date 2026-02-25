@@ -1,0 +1,16 @@
+{
+  "name": "md-compare-ext",
+  "version": "1.0.0",
+  "description": "[Creer Azure Extension](https://learn.microsoft.com/en-us/azure/devops/extend/get-started/node?view=azure-devops)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "azure-devops-extension-sdk": "^4.2.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+    "manifestVersion": 1,
+    "id": "md-compare-ext",
+    "publisher": "jpctx",
+    "version": "1.0.14",
+    "name": "Compare Markdown files",
+    "description": "Comparison tool for Markdown files in preview mode",
+    "public": false,
+    "categories": ["Azure Repos"],
+    "targets": [
+        {
+            "id": "Microsoft.VisualStudio.Services"
+        }
+    ],
+    "scopes": [ "vso.code" ],
+    "files": [
+        { "path": "dist", "addressable": true }
+    ],
+    "contributions": [
+        {
+        "id": "pr-markdown-preview-tab",
+        "type": "ms.vss-web.tab",
+        "targets": [ "ms.vss-code-web.pr-tabs" ],
+        "properties": {
+            "name": "Markdown Preview",
+            "uri": "dist/pr-markdown-preview.html"
+        }
+        }
+    ]
+}
