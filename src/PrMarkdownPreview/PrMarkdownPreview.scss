@@ -6,6 +6,13 @@
     display: flex;
 }
 
+:root {
+  --status-edit-color:   #6b6b6b;
+  --status-add-color:    #107c10;
+  --status-rename-color: #005fb8;
+  --status-delete-color: #c50f1f;
+}
+
 .pr-md-preview__layout {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -13,10 +20,10 @@
   gap: 12px;
   padding: 12px;
   box-sizing: border-box;
-}
-
-.pr-md-preview__layout.false {
-  grid-template-columns: 1fr;
+ 
+    &.false {
+        grid-template-columns: 1fr;
+    }
 }
 
 .pr-md-preview__left {
@@ -56,17 +63,71 @@
 }
 
 .status-badge {
+  display: inline-block;
   text-transform: uppercase;
   font-size: 10px;
   border-radius: 10px;
   padding: 2px 6px;
+  line-height: 1;
   border: 1px solid currentColor;
-
-  &.status-add    { color: #107c10; }
-  &.status-edit { color: #6b6b6b; }
-  &.status-delete  { color: #c50f1f; }
-  &.status-rename  { color: #005fb8; }
+  color: var(--status-edit-color);
+  background: transparent;
 }
+
+
+.status-badge.status-edit,
+.status-badge.status-modify,
+.status-badge.status-modified {
+  color: var(--status-edit-color);
+}
+
+/* 2) ADD / ADDED (edit prime) */
+.status-badge.status-add,
+.status-badge.status-added {
+  color: var(--status-add-color);
+}
+
+/* 3) RENAME / RENAMED / SOURCE_RENAME (add & edit prime) */
+.status-badge.status-rename,
+.status-badge.status-renamed,
+.status-badge.status-source-rename,
+.status-badge.status-source_rename {
+  color: var(--status-rename-color);
+}
+
+/* 4) DELETE / DELETED (max) */
+.status-badge.status-delete,
+.status-badge.status-deleted {
+  color: var(--status-delete-color);
+}
+
+/* rename + edit => rename prime */
+.status-badge.status-rename.status-edit,
+.status-badge.status-renamed.status-edit,
+.status-badge.status-source-rename.status-edit,
+.status-badge.status-source_rename.status-edit {
+  color: var(--status-rename-color);
+}
+
+/* add + edit => add prime */
+.status-badge.status-add.status-edit,
+.status-badge.status-added.status-edit {
+  color: var(--status-add-color);
+}
+
+/* delete + * => delete prime */
+.status-badge.status-delete,
+.status-badge.status-deleted,
+.status-badge.status-delete.status-rename,
+.status-badge.status-delete.status-add,
+.status-badge.status-delete.status-edit,
+.status-badge.status-deleted.status-rename,
+.status-badge.status-deleted.status-add,
+.status-badge.status-deleted.status-edit {
+  color: var(--status-delete-color);
+}
+
+
 
 .pr-md-preview__right {
   overflow: auto;
@@ -79,21 +140,18 @@
   margin-bottom: 8px;
 }
 
-/* Surlignage du diff dans le HTML rendu */
 .md-diff {
-  /* Ajouts */
   ins {
     background: rgba(16, 124, 16, 0.15);
     text-decoration: none;
   }
-  /* Suppressions */
+
   del {
     background: rgba(197, 15, 31, 0.15);
     color: inherit;
     text-decoration: line-through;
   }
 
-  /* Éviter des blocs trop fragmentés : garder inline quand possible */
   p ins, p del, li ins, li del, h1 ins, h2 ins, h3 ins, h4 ins, h5 ins, h6 ins {
     display: inline;
   }
@@ -107,7 +165,6 @@
   padding: 8px 0 24px;
 }
 
-/* Dark mode (optionnel) – ajuste si besoin selon le thème */
 .theme-dark .pr-md-preview__fileitem.is-selected {
   background: rgba(255,255,255,0.06);
 }
@@ -127,7 +184,7 @@
 .pr-md-preview__pane {
   display: flex;
   flex-direction: column;
-  min-height: 400px; /* ajuste si besoin */
+  min-height: 400px;
   border: 1px solid var(--palette-neutral-6, #e1e1e1);
   border-radius: 4px;
   overflow: hidden;
@@ -144,10 +201,9 @@
 .pr-md-preview__paneContent {
   padding: 12px;
   overflow: auto;
-  max-height: calc(100vh - 220px); /* selon ta page */
+  max-height: calc(100vh - 220px);
 }
 
-/* --- Diff styling (déjà en partie présent) --- */
 .md-diff {
   ins {
     background: rgba(16, 124, 16, 0.15);
@@ -164,17 +220,14 @@
   }
 }
 
-/* 🟢 Mode SPLIT : côté gauche (avant) cache les ajouts */
 .pane-left .md-diff ins {
   display: none !important;
 }
 
-/* 🟢 Mode SPLIT : côté droit (après) cache les suppressions */
 .pane-right .md-diff del {
   display: none !important;
 }
 
-/* Dark mode léger */
 .theme-dark .pr-md-preview__subheader {
   background: rgba(255, 255, 255, 0.06);
 }
@@ -184,4 +237,3 @@
 .theme-dark .md-diff del {
   background: rgba(197, 15, 31, 0.25);
 }
-
