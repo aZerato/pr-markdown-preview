@@ -4,5 +4,5 @@ export class MdFileItem {
   tgtCommitId?: string;
   srcContent?: string;
   tgtContent?: string;
-  status?: "added" | "modified" | "deleted" | "renamed";
+  status?: string;
 }

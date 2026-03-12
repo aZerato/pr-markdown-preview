@@ -58,10 +58,11 @@
   padding: 2px 6px;
   border: 1px solid currentColor;
 
-  &.status-added    { color: #107c10; }
-  &.status-modified { color: #6b6b6b; }
-  &.status-deleted  { color: #c50f1f; }
-  &.status-renamed  { color: #005fb8; }
+  &.status-add    { color: #107c10; }
+  &.status-edit { color: #6b6b6b; }
+  &.status-delete  { color: #c50f1f; }
+  &.status-rename  { color: #005fb8; }
+  &.status-merge { color: #b8a600; }
 }
 
 .pr-md-preview__right {

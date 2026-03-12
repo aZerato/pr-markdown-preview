@@ -9,13 +9,13 @@ import * as ReactDOM from "react-dom";
 
 import * as SDK from "azure-devops-extension-sdk";
 import MarkdownIt from "markdown-it";
-import diff from 'html-diff-ts';
+import diff from "html-diff-ts";
 import DOMPurify from "dompurify";
 
-import { AzureAPIHelper } from "./Services/AzureAPIHelper/AzureAPIHelper"
-import { AzurePrConfig } from "./Services/AzureAPIHelper/Models/AzurePrConfig"
-import { MdFileItem } from "./Services/AzureAPIHelper/Models/MdFileItem"
-import { Change } from "./Services/AzureAPIHelper/Models/Change"
+import { AzureAPIHelper } from "./Services/AzureAPIHelper/AzureAPIHelper";
+import { AzurePrConfig } from "./Services/AzureAPIHelper/Models/AzurePrConfig";
+import { MdFileItem } from "./Services/AzureAPIHelper/Models/MdFileItem";
+import { Change } from "./Services/AzureAPIHelper/Models/Change";
 
 interface IPrMarkdownPreviewState {
   panelShown: boolean;
@@ -32,13 +32,17 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
   azurePrConfig: AzurePrConfig;
   private md: MarkdownIt;
 
+  private leftPaneRef = React.createRef<HTMLDivElement>();
+  private rightPaneRef = React.createRef<HTMLDivElement>();
+  private isSyncing = false;
+
   constructor(props: {}) {
     super(props);
     this.state = {
       panelShown: true,
       files: [],
       loading: true,
-      viewMode: "inline"
+      viewMode: "split"
     };
     this.azureAPIHelper = new AzureAPIHelper();
     this.azurePrConfig = new AzurePrConfig();
@@ -58,8 +62,8 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
       const pr = cfg.pullRequest;
       this.azurePrConfig.prId = pr.pullRequestId;
       this.azurePrConfig.mrgCommit = pr.lastMergeCommitId;
-      this.azurePrConfig.srcCommit = pr.lastMergeSourceCommitId;
-      this.azurePrConfig.tgtCommit = pr.lastMergeTargetCommitId;
+      this.azurePrConfig.srcCommit = pr.lastMergeSourceCommitId;   // HEAD (après)
+      this.azurePrConfig.tgtCommit = pr.lastMergeTargetCommitId;   // BASE (avant)
 
       const host = SDK.getHost();
       this.azurePrConfig.organization = host.name;
@@ -69,85 +73,171 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
         this.azurePrConfig.project,
         this.azurePrConfig.repositoryId
       );
-debugger;
-      // 1) Récupérer la liste des changements côté source et target
-      const [filesSrcChgs, filesTgtChgs]: [Change[], Change[]] = await Promise.all([
-        this.azureAPIHelper.GetFilesChanges(this.azurePrConfig.srcCommit),
-        this.azureAPIHelper.GetFilesChanges(this.azurePrConfig.tgtCommit)
-      ]);
+
+      const baseCommitId = this.azurePrConfig.tgtCommit!;
+      const headCommitId = this.azurePrConfig.srcCommit!;
+
+      // --- 1) Construire la liste complète des fichiers MD et agréger les changeType sur TOUS les commits de la PR ---
+      const prCommitIds: string[] = (pr?.commits ?? []).map((c: any) => c.commitId);
+      // ordre probable: du plus récent au plus ancien → on inverse pour avoir ancien → récent
+      const orderedCommitIds = [...prCommitIds].reverse();
 
       const isMd = (path: string) => /\.(md|markdown)$/i.test(path);
-
-      // 2) Construire une map path -> MdFileItem (fusion src/tgt)
       const byPath = new Map<string, MdFileItem>();
 
-      for (const chg of filesSrcChgs) 
-      {
-        if (!isMd(chg.item.path)) continue;
-        const entry = byPath.get(chg.item.path) ?? {
-          path: chg.item.path,
-        };      
-        entry.srcCommitId = chg.item.commitId;
-        entry.status = entry.status ?? "modified";
-        byPath.set(chg.item.path, entry);
+      // Pour construire status à partir des changeType agrégés
+      // clé: path → Map(lowerFlag -> originalTokenTelQuel) pour éviter les doublons tout en conservant l'écriture d'origine
+      const flagsByPath = new Map<string, Map<string, string>>();
+
+      const splitFlags = (ct: string | undefined): string[] =>
+        (ct ?? "")
+          .split(/[,\s]+/)
+          .map(t => t.trim())
+          .filter(Boolean);
+
+      if (orderedCommitIds.length > 0) {
+        // Charger les changements de chaque commit en parallèle
+        const perCommitChanges: Change[][] = await Promise.all(
+          orderedCommitIds.map((cid) => this.azureAPIHelper.GetFilesChanges(cid))
+        );
+
+        // Agrégation des chemins + changeType
+        for (let i = 0; i < perCommitChanges.length; i++) {
+          const chgs = perCommitChanges[i];
+          for (const chg of chgs) {
+            const p = chg?.item?.path;
+            if (!p || !isMd(p)) continue;
+
+            // Entry (avec commits de comparaison fixés à base↔head)
+            const entry = byPath.get(p) ?? ({
+              path: p,
+              srcCommitId: headCommitId,
+              tgtCommitId: baseCommitId
+            } as MdFileItem);
+            entry.srcCommitId = headCommitId;
+            entry.tgtCommitId = baseCommitId;
+            byPath.set(p, entry);
+
+            // Agréger les flags du changeType tel que renvoyé par l'API
+            const tokens = splitFlags(chg.changeType);
+            if (tokens.length) {
+              const flagMap = flagsByPath.get(p) ?? new Map<string, string>();
+              for (const tok of tokens) {
+                const key = tok.toLowerCase();
+                if (!flagMap.has(key)) flagMap.set(key, tok); // on garde la première casse rencontrée
+              }
+              flagsByPath.set(p, flagMap);
+            }
+          }
+        }
+      } else {
+        // 🔁 Fallback : pas de commits listés → on retombe sur l'union base/head comme avant
+        const [filesSrcChgs, filesTgtChgs]: [Change[], Change[]] = await Promise.all([
+          this.azureAPIHelper.GetFilesChanges(headCommitId),
+          this.azureAPIHelper.GetFilesChanges(baseCommitId)
+        ]);
+
+        for (const chg of filesSrcChgs) {
+          const p = chg?.item?.path;
+          if (!p || !isMd(p)) continue;
+
+          const entry = byPath.get(p) ?? ({
+            path: p,
+            srcCommitId: headCommitId,
+            tgtCommitId: baseCommitId
+          } as MdFileItem);
+          byPath.set(p, entry);
+
+          const tokens = splitFlags(chg.changeType);
+          if (tokens.length) {
+            const flagMap = flagsByPath.get(p) ?? new Map<string, string>();
+            for (const tok of tokens) {
+              const key = tok.toLowerCase();
+              if (!flagMap.has(key)) flagMap.set(key, tok);
+            }
+            flagsByPath.set(p, flagMap);
+          }
+        }
+
+        for (const chg of filesTgtChgs) {
+          const p = chg?.item?.path;
+          if (!p || !isMd(p)) continue;
+
+          const entry = byPath.get(p) ?? ({
+            path: p,
+            srcCommitId: headCommitId,
+            tgtCommitId: baseCommitId
+          } as MdFileItem);
+          byPath.set(p, entry);
+
+          const tokens = splitFlags(chg.changeType);
+          if (tokens.length) {
+            const flagMap = flagsByPath.get(p) ?? new Map<string, string>();
+            for (const tok of tokens) {
+              const key = tok.toLowerCase();
+              if (!flagMap.has(key)) flagMap.set(key, tok);
+            }
+            flagsByPath.set(p, flagMap);
+          }
+        }
       }
 
-      for (const chg of filesTgtChgs) {
-        if (!isMd(chg.item.path)) continue;
-        const entry = byPath.get(chg.item.path) ?? {
-          path: chg.item.path
-        };
-        entry.tgtCommitId = chg.item.commitId;
-        entry.status = entry.status ?? "modified";
-        byPath.set(chg.item.path, entry);
-      }
-
-      // Affiner status : added / deleted / modified
-      for (const [, entry] of byPath) {
-        if (entry.srcCommitId && !entry.tgtCommitId) entry.status = "added";
-        else if (!entry.srcCommitId && entry.tgtCommitId) entry.status = "deleted";
-        else entry.status = "modified";
-      }
-
-      // 3) Charger les contenus (en parallèle)
+      // --- 2) Charger les contenus aux DEUX commits pour le diff ---
       const items = Array.from(byPath.values());
 
       await Promise.all(
         items.map(async (it) => {
-          if (it.srcCommitId) {
-            it.srcContent = await this.azureAPIHelper.GetFileContent(it.path, it.srcCommitId);
-          } else {
-            it.srcContent = ""; // vide si absent
+          // BASE (target)
+          try {
+            it.tgtContent = await this.azureAPIHelper.GetFileContent(it.path, it.tgtCommitId!);
+          } catch {
+            it.tgtContent = ""; // n'existe pas à base
           }
-          if (it.tgtCommitId) {
-            it.tgtContent = await this.azureAPIHelper.GetFileContent(it.path, it.tgtCommitId);
-          } else {
-            it.tgtContent = "";
+          // HEAD (source)
+          try {
+            it.srcContent = await this.azureAPIHelper.GetFileContent(it.path, it.srcCommitId!);
+          } catch {
+            it.srcContent = ""; // n'existe pas à head
           }
         })
       );
 
-      // 4) Mettre à jour l’état
-      this.setState({
-        files: items.sort((a, b) => a.path.localeCompare(b.path)),
-        loading: false,
-        selectedPath: items.length ? items[0].path : undefined
-      }, () => {
-        if (this.state.selectedPath) {
-          this.computeAndSetDiff(this.state.selectedPath!);
+      // --- 3) Poser le status = concat des changeType agrégés sur l'ensemble des commits de la PR ---
+      for (const it of items) {
+        const flags = flagsByPath.get(it.path);
+        if (flags && flags.size > 0) {
+          // Concatène exactement tels quels (ex: "rename, edit")
+          it.status = Array.from(flags.values()).join(", ");
+        } else {
+          // Aucun changeType trouvé dans la PR pour ce fichier (cas rare) → laisse vide ou "edit" par défaut
+          it.status = ""; // tu peux mettre "edit" si tu veux un défaut
         }
-      });
+      }
 
+      // --- 4) État & 1ère sélection ---
+      this.setState(
+        {
+          files: items.sort((a, b) => a.path.localeCompare(b.path)),
+          loading: false,
+          selectedPath: items.length ? items[0].path : undefined
+        },
+        () => {
+          if (this.state.selectedPath) {
+            this.computeAndSetDiff(this.state.selectedPath!);
+          }
+        }
+      );
     } catch (e: any) {
       console.error(e);
       this.setState({ loading: false, error: e?.message ?? String(e) });
     }
   }
 
-  private buildDiffHtml(src: string, tgt: string): string {
-    const htmlA = this.md.render(src ?? "");
-    const htmlB = this.md.render(tgt ?? "");
-    const res = diff(htmlA, htmlB);
+  /** Diff HTML sur le rendu Markdown : BASE -> HEAD (ajouts en <ins>, suppressions en <del>) */
+  private buildDiffHtml(baseContent: string, headContent: string): string {
+    const htmlBase = this.md.render(baseContent ?? "");
+    const htmlHead = this.md.render(headContent ?? "");
+    const res = diff(htmlBase, htmlHead);
     const safe = DOMPurify.sanitize(res, {
       ADD_TAGS: ["ins", "del"],
       ADD_ATTR: ["class", "style"]
@@ -156,7 +246,7 @@ debugger;
   }
 
   private computeAndSetDiff(path: string) {
-    const item = this.state.files.find(f => f.path === path);
+    const item = this.state.files.find((f) => f.path === path);
     if (!item) return;
 
     const diffHtml = this.buildDiffHtml(item.tgtContent ?? "", item.srcContent ?? "");
@@ -167,10 +257,6 @@ debugger;
     this.setState({ viewMode: mode });
   }
 
-  private leftPaneRef = React.createRef<HTMLDivElement>();
-  private rightPaneRef = React.createRef<HTMLDivElement>();
-  private isSyncing = false;
-
   private syncScroll(source: "left" | "right") {
     if (this.isSyncing) return;
     const left = this.leftPaneRef.current;
@@ -180,7 +266,7 @@ debugger;
     const from = source === "left" ? left : right;
     const to = source === "left" ? right : left;
 
-    const ratio = from.scrollTop / Math.max(1, (from.scrollHeight - from.clientHeight));
+    const ratio = from.scrollTop / Math.max(1, from.scrollHeight - from.clientHeight);
     this.isSyncing = true;
     to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
     this.isSyncing = false;
@@ -246,7 +332,7 @@ debugger;
             <aside className="pr-md-preview__left">
               <div className="pr-md-preview__left__header">Fichiers Markdown</div>
               <ul className="pr-md-preview__filelist">
-                {files.map(f => {
+                {files.map((f) => {
                   const isSelected = f.path === selectedPath;
                   return (
                     <li
@@ -255,7 +341,10 @@ debugger;
                       onClick={() => this.computeAndSetDiff(f.path)}
                       title={f.path}
                     >
-                      <span className={`status-badge status-${f.status}`}>{f.status}</span>
+                      {/* status = concat des changeType agrégés (ex: "rename, edit") */}
+                      <span className={`status-badge status-${(f.status ?? "").replace(/\s+/g, "-")}`}>
+                        {f.status}
+                      </span>
                       <span className="path">{f.path}</span>
                     </li>
                   );
@@ -263,7 +352,7 @@ debugger;
               </ul>
             </aside>
 
-            {/* Zone droite : preview avec diff */}            
+            {/* Zone droite : preview avec diff */}
             <main className="pr-md-preview__right">
               {selectedPath ? (
                 <>
@@ -278,6 +367,7 @@ debugger;
                     />
                   ) : (
                     <div className="pr-md-preview__split">
+                      {/* Avant (cache <ins>) */}
                       <section className="pr-md-preview__pane pane-left">
                         <div className="pr-md-preview__subheader">Avant (cible)</div>
                         <div
@@ -288,6 +378,7 @@ debugger;
                         />
                       </section>
 
+                      {/* Après (cache <del>) */}
                       <section className="pr-md-preview__pane pane-right">
                         <div className="pr-md-preview__subheader">Après (source)</div>
                         <div
