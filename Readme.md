@@ -21,7 +21,7 @@ Déployez l'extension dans le marketplace, puis vous allez pouvoir lancer l'appl
 
 Ouvrez dans le navigateur l'url, et ignorer l'alert du certificat car nous sommes en locahost\* :
 
-[](https://localhost:3000/dist/PrMarkdownPreview/PrMarkdownPreview.html)
+[Site local](https://localhost:3000/dist/PrMarkdownPreview/PrMarkdownPreview.html)
 
 Vous avez à approuver une notification de votre navigateur, car du contexte du site https://dev.azure.com/ notre extension souhaite communiquer avec le localhost :
 
