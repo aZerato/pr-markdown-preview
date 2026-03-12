@@ -5,3 +5,111 @@
     width: 100%;
     display: flex;
 }
+
+.pr-md-preview__layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: calc(100vh - 120px);
+  gap: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.pr-md-preview__left {
+  border-right: 1px solid var(--palette-neutral-6, #e1e1e1);
+  overflow: auto;
+}
+
+.pr-md-preview__left__header {
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--palette-neutral-6, #e1e1e1);
+}
+
+.pr-md-preview__filelist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pr-md-preview__fileitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(0,0,0,.05);
+
+  &.is-selected {
+    background: var(--palette-neutral-4, #f6f6f6);
+  }
+
+  .path {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.status-badge {
+  text-transform: uppercase;
+  font-size: 10px;
+  border-radius: 10px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+
+  &.status-added    { color: #107c10; }
+  &.status-modified { color: #6b6b6b; }
+  &.status-deleted  { color: #c50f1f; }
+  &.status-renamed  { color: #005fb8; }
+}
+
+.pr-md-preview__right {
+  overflow: auto;
+}
+
+.pr-md-preview__right__header {
+  font-weight: 600;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--palette-neutral-6, #e1e1e1);
+  margin-bottom: 8px;
+}
+
+/* Surlignage du diff dans le HTML rendu */
+.md-diff {
+  /* Ajouts */
+  ins {
+    background: rgba(16, 124, 16, 0.15);
+    text-decoration: none;
+  }
+  /* Suppressions */
+  del {
+    background: rgba(197, 15, 31, 0.15);
+    color: inherit;
+    text-decoration: line-through;
+  }
+
+  /* Éviter des blocs trop fragmentés : garder inline quand possible */
+  p ins, p del, li ins, li del, h1 ins, h2 ins, h3 ins, h4 ins, h5 ins, h6 ins {
+    display: inline;
+  }
+
+  pre code ins, pre code del {
+    display: inline;
+  }
+}
+
+.pr-md-preview__preview {
+  padding: 8px 0 24px;
+}
+
+/* Dark mode (optionnel) – ajuste si besoin selon le thème */
+.theme-dark .pr-md-preview__fileitem.is-selected {
+  background: rgba(255,255,255,0.06);
+}
+.theme-dark .md-diff ins {
+  background: rgba(16, 124, 16, 0.25);
+}
+.theme-dark .md-diff del {
+  background: rgba(197, 15, 31, 0.25);
+}

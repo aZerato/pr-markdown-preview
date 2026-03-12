@@ -31,7 +31,7 @@ export class AzureAPIHelper {
 
   public async GetCommits(
     prId: string
-  )
+  ) : Promise<Commit[]>
   {
     const u = new URL(`https://dev.azure.com/${this.organization}/${this.project}/_apis/git/repositories/${this.repositoryId}/pullRequests/${prId}/commits`);
     u.searchParams.set("api-version", "7.1");
@@ -55,7 +55,7 @@ export class AzureAPIHelper {
 
   public async GetFilesChanges(
     commitId: string
-  )
+  ) : Promise<Change[]>
   {
     const u = new URL(`https://dev.azure.com/${this.organization}/${this.project}/_apis/git/repositories/${this.repositoryId}/commits/${commitId}/changes`);
     u.searchParams.set("api-version", "7.1");
@@ -80,7 +80,7 @@ export class AzureAPIHelper {
   public async GetFileContent(
     filePath: string,
     commitId: string
-  )
+  ) : Promise<string>
   {
     const u = new URL(`https://dev.azure.com/${this.organization}/${this.project}/_apis/git/repositories/${this.repositoryId}/items`);
     u.searchParams.set("api-version", "7.1");
@@ -102,7 +102,8 @@ export class AzureAPIHelper {
 
   public async GetDiffs(
     baseCommit: string, 
-    targetCommit: string)
+    targetCommit: string
+)
   {
     const u = new URL(`https://dev.azure.com/${this.organization}/${this.project}/_apis/git/repositories/${this.repositoryId}/diffs/commits`);
     u.searchParams.set("api-version", "7.1");
