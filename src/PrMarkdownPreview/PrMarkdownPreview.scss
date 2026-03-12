@@ -15,6 +15,10 @@
   box-sizing: border-box;
 }
 
+.pr-md-preview__layout.false {
+  grid-template-columns: 1fr;
+}
+
 .pr-md-preview__left {
   border-right: 1px solid var(--palette-neutral-6, #e1e1e1);
   overflow: auto;
@@ -62,7 +66,6 @@
   &.status-edit { color: #6b6b6b; }
   &.status-delete  { color: #c50f1f; }
   &.status-rename  { color: #005fb8; }
-  &.status-merge { color: #b8a600; }
 }
 
 .pr-md-preview__right {

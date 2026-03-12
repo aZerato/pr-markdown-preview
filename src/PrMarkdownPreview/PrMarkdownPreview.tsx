@@ -326,9 +326,10 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
           />
         )}
 
-        {panelShown && files.length > 0 && (
-          <div className="pr-md-preview__layout">
+        {files.length > 0 && (
+          <div className={`pr-md-preview__layout ${panelShown}`}>
             {/* Panneau gauche : liste de fichiers */}
+            {panelShown && (
             <aside className="pr-md-preview__left">
               <div className="pr-md-preview__left__header">Fichiers Markdown</div>
               <ul className="pr-md-preview__filelist">
@@ -351,6 +352,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
                 })}
               </ul>
             </aside>
+            )}
 
             {/* Zone droite : preview avec diff */}
             <main className="pr-md-preview__right">
