@@ -8,6 +8,9 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 
 import * as SDK from "azure-devops-extension-sdk";
+import MarkdownIt from "markdown-it";
+import diff from 'html-diff-ts';
+import DOMPurify from "dompurify";
 
 import { AzureAPIHelper } from "./Services/AzureAPIHelper/AzureAPIHelper"
 import { AzurePrConfig } from "./Services/AzureAPIHelper/Models/AzurePrConfig"
@@ -21,11 +24,8 @@ interface IPrMarkdownPreviewState {
   diffHtml?: string;
   loading: boolean;
   error?: string;
+  viewMode: "inline" | "split";
 }
-
-import MarkdownIt from "markdown-it";
-import diff from 'html-diff-ts';
-import DOMPurify from "dompurify";
 
 class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
   azureAPIHelper: AzureAPIHelper;
@@ -35,9 +35,10 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
   constructor(props: {}) {
     super(props);
     this.state = {
-      panelShown: true,  // on l’ouvre par défaut pour la démo
+      panelShown: true,
       files: [],
-      loading: true
+      loading: true,
+      viewMode: "inline"
     };
     this.azureAPIHelper = new AzureAPIHelper();
     this.azurePrConfig = new AzurePrConfig();
@@ -68,7 +69,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
         this.azurePrConfig.project,
         this.azurePrConfig.repositoryId
       );
-
+debugger;
       // 1) Récupérer la liste des changements côté source et target
       const [filesSrcChgs, filesTgtChgs]: [Change[], Change[]] = await Promise.all([
         this.azureAPIHelper.GetFilesChanges(this.azurePrConfig.srcCommit),
@@ -130,7 +131,6 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
       this.setState({
         files: items.sort((a, b) => a.path.localeCompare(b.path)),
         loading: false,
-        // Optionnel : sélection automatique du premier fichier
         selectedPath: items.length ? items[0].path : undefined
       }, () => {
         if (this.state.selectedPath) {
@@ -144,13 +144,10 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
     }
   }
 
-
-private buildDiffHtml(src: string, tgt: string): string {
+  private buildDiffHtml(src: string, tgt: string): string {
     const htmlA = this.md.render(src ?? "");
     const htmlB = this.md.render(tgt ?? "");
-    debugger;
-    const res = diff(htmlA, htmlB); // ajoute <ins>/<del>
-    // Autoriser/assainir (ins/del sont safe par défaut)
+    const res = diff(htmlA, htmlB);
     const safe = DOMPurify.sanitize(res, {
       ADD_TAGS: ["ins", "del"],
       ADD_ATTR: ["class", "style"]
@@ -166,8 +163,30 @@ private buildDiffHtml(src: string, tgt: string): string {
     this.setState({ diffHtml, selectedPath: path });
   }
 
+  private setViewMode(mode: "inline" | "split") {
+    this.setState({ viewMode: mode });
+  }
 
-public render(): JSX.Element {
+  private leftPaneRef = React.createRef<HTMLDivElement>();
+  private rightPaneRef = React.createRef<HTMLDivElement>();
+  private isSyncing = false;
+
+  private syncScroll(source: "left" | "right") {
+    if (this.isSyncing) return;
+    const left = this.leftPaneRef.current;
+    const right = this.rightPaneRef.current;
+    if (!left || !right) return;
+
+    const from = source === "left" ? left : right;
+    const to = source === "left" ? right : left;
+
+    const ratio = from.scrollTop / Math.max(1, (from.scrollHeight - from.clientHeight));
+    this.isSyncing = true;
+    to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
+    this.isSyncing = false;
+  }
+
+  public render(): JSX.Element {
     const { panelShown, loading, error, files, selectedPath, diffHtml } = this.state;
 
     return (
@@ -180,6 +199,18 @@ public render(): JSX.Element {
               text: panelShown ? "Fermer le panneau" : "Ouvrir le panneau",
               iconProps: { iconName: "Preview" },
               onActivate: () => this.togglePanel()
+            },
+            {
+              id: "inline-mode",
+              text: "Inline",
+              iconProps: { iconName: this.state.viewMode === "inline" ? "CheckMark" : "Compare" },
+              onActivate: () => this.setViewMode("inline")
+            },
+            {
+              id: "split-mode",
+              text: "Côte à côte",
+              iconProps: { iconName: this.state.viewMode === "split" ? "CheckMark" : "SideBySide" },
+              onActivate: () => this.setViewMode("split")
             }
           ]}
         />
@@ -232,16 +263,42 @@ public render(): JSX.Element {
               </ul>
             </aside>
 
-            {/* Zone droite : preview avec diff */}
+            {/* Zone droite : preview avec diff */}            
             <main className="pr-md-preview__right">
               {selectedPath ? (
                 <>
-                  <div className="pr-md-preview__right__header">{selectedPath}</div>
-                  <div
-                    className="md-diff pr-md-preview__preview"
-                    // HTML assaini par DOMPurify avant
-                    dangerouslySetInnerHTML={{ __html: diffHtml ?? "" }}
-                  />
+                  <div className="pr-md-preview__right__header">
+                    {selectedPath} — {this.state.viewMode === "inline" ? "Inline" : "Côte à côte"}
+                  </div>
+
+                  {this.state.viewMode === "inline" ? (
+                    <div
+                      className="md-diff pr-md-preview__preview"
+                      dangerouslySetInnerHTML={{ __html: diffHtml ?? "" }}
+                    />
+                  ) : (
+                    <div className="pr-md-preview__split">
+                      <section className="pr-md-preview__pane pane-left">
+                        <div className="pr-md-preview__subheader">Avant (cible)</div>
+                        <div
+                          ref={this.leftPaneRef}
+                          className="md-diff pr-md-preview__paneContent"
+                          onScroll={() => this.syncScroll("left")}
+                          dangerouslySetInnerHTML={{ __html: diffHtml ?? "" }}
+                        />
+                      </section>
+
+                      <section className="pr-md-preview__pane pane-right">
+                        <div className="pr-md-preview__subheader">Après (source)</div>
+                        <div
+                          ref={this.rightPaneRef}
+                          className="md-diff pr-md-preview__paneContent"
+                          onScroll={() => this.syncScroll("right")}
+                          dangerouslySetInnerHTML={{ __html: diffHtml ?? "" }}
+                        />
+                      </section>
+                    </div>
+                  )}
                 </>
               ) : (
                 <ZeroData

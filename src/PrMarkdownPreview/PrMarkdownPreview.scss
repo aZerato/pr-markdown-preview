@@ -113,3 +113,71 @@
 .theme-dark .md-diff del {
   background: rgba(197, 15, 31, 0.25);
 }
+
+.pr-md-preview__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pr-md-preview__pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 400px; /* ajuste si besoin */
+  border: 1px solid var(--palette-neutral-6, #e1e1e1);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--palette-neutral-0, #fff);
+}
+
+.pr-md-preview__subheader {
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--palette-neutral-6, #e1e1e1);
+  background: var(--palette-neutral-4, #f6f6f6);
+}
+
+.pr-md-preview__paneContent {
+  padding: 12px;
+  overflow: auto;
+  max-height: calc(100vh - 220px); /* selon ta page */
+}
+
+/* --- Diff styling (déjà en partie présent) --- */
+.md-diff {
+  ins {
+    background: rgba(16, 124, 16, 0.15);
+    text-decoration: none;
+  }
+  del {
+    background: rgba(197, 15, 31, 0.15);
+    color: inherit;
+    text-decoration: line-through;
+  }
+  p ins, p del, li ins, li del, h1 ins, h2 ins, h3 ins, h4 ins, h5 ins, h6 ins,
+  pre code ins, pre code del {
+    display: inline;
+  }
+}
+
+/* 🟢 Mode SPLIT : côté gauche (avant) cache les ajouts */
+.pane-left .md-diff ins {
+  display: none !important;
+}
+
+/* 🟢 Mode SPLIT : côté droit (après) cache les suppressions */
+.pane-right .md-diff del {
+  display: none !important;
+}
+
+/* Dark mode léger */
+.theme-dark .pr-md-preview__subheader {
+  background: rgba(255, 255, 255, 0.06);
+}
+.theme-dark .md-diff ins {
+  background: rgba(16, 124, 16, 0.25);
+}
+.theme-dark .md-diff del {
+  background: rgba(197, 15, 31, 0.25);
+}
+
