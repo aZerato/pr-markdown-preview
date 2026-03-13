@@ -1,5 +1,5 @@
 {
-  "name": "md-compare-ext",
+  "name": "pr-markdown-preview",
   "version": "1.0.0",
   "description": "[Creer Azure Extension](https://learn.microsoft.com/en-us/azure/devops/extend/get-started/node?view=azure-devops)",
   "main": "index.js",
