@@ -1,8 +1,16 @@
 # Dev
 
-## Debug
+## Release
 
-[Projet de base](https://github.com/microsoft/azure-devops-extension-hot-reload-and-debug)
+> npx webpack --mode production
+
+Ensuite vous devez changer le numéro de version dans vss-extension.json.
+
+Vous allez pouvoir packager l'extension en mode "dev" :
+
+> npx tfx-cli extension create --manifest-globs vss-extension.json --overrides-file configs/release.json
+
+## Debug
 
 Il faut compiler l'app pour générer le dist/ :
 

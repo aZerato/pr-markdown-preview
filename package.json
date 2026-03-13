@@ -1,11 +1,11 @@
 {
   "name": "pr-markdown-preview",
-  "description": "Use hot reload and debug directly in VS Code",
-  "author": "Microsoft",
+  "description": "Pull Request : Comparison tool for Markdown files in preview mode",
+  "author": "jpctx",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/microsoft/azure-devops-extension-pr-markdown-preview"
+    "url": "https://github.com/aZerato/pr-markdown-preview"
   },
   "scripts": {
     "clean": "rimraf ./dist ./out",
