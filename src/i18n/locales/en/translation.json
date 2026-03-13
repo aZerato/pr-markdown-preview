@@ -1,0 +1,14 @@
+{
+  "app.title": "PR Markdown Preview",
+  "left.title": "Markdown files",
+  "right.before": "Before (target)",
+  "right.after": "After (source)",
+  "loading": "Loading PR Markdown files…",
+  "error.title": "Loading error",
+  "empty": "No Markdown file in this PR.",
+  "select.prompt": "Select a file to preview.",
+  "view.closepanel": "Close side panel",
+  "view.openpanel": "Open side panel",
+  "view.inline": "Inline",
+  "view.split": "Side by side"
+}

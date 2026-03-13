@@ -2,9 +2,12 @@ const path = require("path");
 const fs = require("fs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
+const IGNORED = new Set(["i18n"]);
+
 const entries = fs
   .readdirSync(path.join(__dirname, "src"))
   .filter((dir) => fs.statSync(path.join("src", dir)).isDirectory())
+  .filter((dir) => !IGNORED.has(dir))
   .reduce((acc, dir) => ({ ...acc, [dir]: `./src/${dir}/${dir}` }), {});
 
 module.exports = {

@@ -17,6 +17,9 @@ import { AzurePrConfig } from "./Services/AzureAPIHelper/Models/AzurePrConfig";
 import { MdFileItem } from "./Services/AzureAPIHelper/Models/MdFileItem";
 import { Change } from "./Services/AzureAPIHelper/Models/Change";
 
+import "../i18n/i18n";
+import { withTranslation, WithTranslation } from "react-i18next";
+
 interface IPrMarkdownPreviewState {
   panelShown: boolean;
   files: MdFileItem[];
@@ -27,7 +30,7 @@ interface IPrMarkdownPreviewState {
   viewMode: "inline" | "split";
 }
 
-class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
+class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPreviewState> {
   azureAPIHelper: AzureAPIHelper;
   azurePrConfig: AzurePrConfig;
   private md: MarkdownIt;
@@ -36,7 +39,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
   private rightPaneRef = React.createRef<HTMLDivElement>();
   private isSyncing = false;
 
-  constructor(props: {}) {
+  constructor(props: WithTranslation) {
     super(props);
     this.state = {
       panelShown: true,
@@ -351,27 +354,27 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
 
   public render(): JSX.Element {
     const { panelShown, loading, error, files, selectedPath, diffHtml } = this.state;
-
+    const { t } = this.props;
     return (
       <Page className="flex-grow">
         <Header
-          title="PR Markdown Preview"
+          title={t("app.title")}
           commandBarItems={[
             {
               id: "panel-button",
-              text: panelShown ? "Fermer le panneau" : "Ouvrir le panneau",
-              iconProps: { iconName: "Preview" },
+              text: panelShown ? t("view.closepanel") : t("view.openpanel"),
+              iconProps: { iconName: "ClosePane" },
               onActivate: () => this.togglePanel()
             },
             {
               id: "inline-mode",
-              text: "Inline",
+              text: t("view.inline"),
               iconProps: { iconName: this.state.viewMode === "inline" ? "CheckMark" : "Compare" },
               onActivate: () => this.setViewMode("inline")
             },
             {
               id: "split-mode",
-              text: "Côte à côte",
+              text: t("view.split"),
               iconProps: { iconName: this.state.viewMode === "split" ? "CheckMark" : "SideBySide" },
               onActivate: () => this.setViewMode("split")
             }
@@ -380,7 +383,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
 
         {loading && (
           <ZeroData
-            primaryText="Chargement des fichiers Markdown de la PR…"
+            primaryText={t("loading")}
             imageAltText="Loading"
             iconProps={{ iconName: "Spinner" }}
           />
@@ -388,7 +391,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
 
         {error && (
           <ZeroData
-            primaryText="Erreur lors du chargement"
+            primaryText={t("error.title")}
             secondaryText={<span>{error}</span>}
             imageAltText="Error"
             iconProps={{ iconName: "Error" }}
@@ -397,7 +400,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
 
         {!loading && !error && files.length === 0 && (
           <ZeroData
-            primaryText="Aucun fichier Markdown dans cette PR."
+            primaryText={t("empty")}
             imageAltText="No data"
             iconProps={{ iconName: "Info" }}
           />
@@ -408,7 +411,15 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
             {/* Panneau gauche : liste de fichiers */}
             {panelShown && (
               <aside className="pr-md-preview__left">
-                <div className="pr-md-preview__left__header">Fichiers Markdown</div>
+                <div className="pr-md-preview__left__header">
+                  <span>
+                    <ZeroData
+                      primaryText={t("left.title")}
+                      imageAltText="Title"
+                      iconProps={{ iconName: "Documentation" }}
+                    />
+                  </span>
+                </div>
                 <ul className="pr-md-preview__filelist">
                   {files.map((f) => {
                     const isSelected = f.path === selectedPath;
@@ -436,7 +447,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
               {selectedPath ? (
                 <>
                   <div className="pr-md-preview__right__header">
-                    {selectedPath} — {this.state.viewMode === "inline" ? "Inline" : "Côte à côte"}
+                    {selectedPath} — {this.state.viewMode === "inline" ? t("view.inline") : t("view.split")}
                   </div>
 
                   {this.state.viewMode === "inline" ? (
@@ -448,7 +459,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
                     <div className="pr-md-preview__split">
                       {/* Avant (cache <ins>) */}
                       <section className="pr-md-preview__pane pane-left">
-                        <div className="pr-md-preview__subheader">Avant (cible)</div>
+                        <div className="pr-md-preview__subheader">{t("right.before")}</div>
                         <div
                           ref={this.leftPaneRef}
                           className="md-diff pr-md-preview__paneContent"
@@ -459,7 +470,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
 
                       {/* Après (cache <del>) */}
                       <section className="pr-md-preview__pane pane-right">
-                        <div className="pr-md-preview__subheader">Après (source)</div>
+                        <div className="pr-md-preview__subheader">{t("right.after")}</div>
                         <div
                           ref={this.rightPaneRef}
                           className="md-diff pr-md-preview__paneContent"
@@ -472,7 +483,7 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
                 </>
               ) : (
                 <ZeroData
-                  primaryText="Sélectionnez un fichier pour voir la prévisualisation."
+                  primaryText={t("select.prompt")}
                   imageAltText="Select"
                   iconProps={{ iconName: "Edit" }}
                 />
@@ -489,4 +500,5 @@ class PrMarkdownPreview extends React.Component<{}, IPrMarkdownPreviewState> {
   }
 }
 
-ReactDOM.render(<PrMarkdownPreview />, document.getElementById("root"));
+const TranslatedPrMarkdownPreview = withTranslation('translation')(PrMarkdownPreview);
+ReactDOM.render(<TranslatedPrMarkdownPreview />, document.getElementById("root"));

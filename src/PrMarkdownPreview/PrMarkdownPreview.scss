@@ -32,9 +32,17 @@
 }
 
 .pr-md-preview__left__header {
-  font-weight: 600;
+  font-weight: 200;
   padding: 8px 12px;
   border-bottom: 1px solid var(--palette-neutral-6, #e1e1e1);
+
+  .fabric-icon {
+    font-size: 40px !important;
+  }
+
+  .title-l {
+    font-size: 20px !important;
+  }
 }
 
 .pr-md-preview__filelist {
