@@ -14,8 +14,7 @@ module.exports = {
   entry: entries,
   devtool: "inline-source-map",
   output: {
-    filename: "[name]/[name].js",
-    publicPath: "/dist/",
+    filename: "[name]/[name].js"
   },
   mode: 'development',
   devServer: {
@@ -56,6 +55,7 @@ module.exports = {
       {
         test: /\.(eot|svg|ttf|woff|woff2|png|jpg|gif)$/i,
         type: "asset",
+        dependency: { not: ['url'] },
       },
     ],
   },
