@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "pr-markdown-preview",
     "publisher": "jpctx",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "name": "PR Markdown Preview",
     "description": "Pull Request : Comparison tool for Markdown files in preview mode",
     "public": false,
