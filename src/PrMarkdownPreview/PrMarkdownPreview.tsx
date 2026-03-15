@@ -65,8 +65,8 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
       const pr = cfg.pullRequest;
       this.azurePrConfig.prId = pr.pullRequestId;
       this.azurePrConfig.mrgCommit = pr.lastMergeCommitId;
-      this.azurePrConfig.srcCommit = pr.lastMergeSourceCommitId;   // HEAD (après)
-      this.azurePrConfig.tgtCommit = pr.lastMergeTargetCommitId;   // BASE (avant)
+      this.azurePrConfig.srcCommit = pr.lastMergeSourceCommitId;   // HEAD (after)
+      this.azurePrConfig.tgtCommit = pr.lastMergeTargetCommitId;   // BASE (before)
 
       const host = SDK.getHost();
       this.azurePrConfig.organization = host.name;
@@ -80,21 +80,20 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
       const baseCommitId = this.azurePrConfig.tgtCommit!;
       const headCommitId = this.azurePrConfig.srcCommit!;
 
-      // --- 1) Construire la liste complète des fichiers MD & agréger les changeType sur TOUS les commits de la PR ---
+      // --- 1) Build list of md files  ---
       const prCommitIds: string[] = (pr?.commits ?? []).map((c: any) => c.commitId);
-      // ordre probable: du plus récent au plus ancien → on inverse pour avoir ancien → récent
+      // we have to reverse order, to have older commits in first.
       const orderedCommitIds = [...prCommitIds].reverse();
 
       const isMd = (path: string) => /\.(md|markdown)$/i.test(path);
 
-      // Union finale des fichiers affichés (clé = chemin final)
+      // Files to show
       const byPath = new Map<string, MdFileItem>();
 
-      // Agrégation des flags "changeType" EXACTS par chemin final (on garde la 1re casse rencontrée)
-      const flagsByPath = new Map<string, Map<string, string>>(); // path -> (flagLower -> flagTokenTelQuel)
+      // Flags "changeType"
+      const flagsByPath = new Map<string, Map<string, string>>();
 
-      // --- Gestion des renames ---
-      // oldToNew : map des anciens chemins vers les nouveaux (chaînés si plusieurs renames)
+      // Rename histories
       const oldToNew = new Map<string, string>();
       const newToOld = new Map<string, string>();
 
@@ -133,77 +132,19 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
         return cur;
       };
 
-      // Pour lookup du contenu BASE sur l'ancien chemin quand il y a rename
+      // lookup BASE
       const baseLookupPathByNewPath = new Map<string, string>();
 
-      if (orderedCommitIds.length > 0) {
-        // Charger les changements de chaque commit en parallèle
-        const perCommitChanges: Change[][] = await Promise.all(
-          orderedCommitIds.map((cid) => this.azureAPIHelper.GetFilesChanges(cid))
-        );
+      // load all commits ||
+      const perCommitChanges: Change[][] = await Promise.all(
+        orderedCommitIds.map((cid) => this.azureAPIHelper.GetFilesChanges(cid))
+      );
 
-        // 1ère passe : détecter les paires de rename (old -> new)
-        for (const commitChanges of perCommitChanges) {
-          for (const chg of commitChanges) {
-            const tokens = splitFlags(chg.changeType);
-            // Sur le NOUVEAU chemin (rename), on devrait avoir sourceServerItem = ancien chemin
-            const anyChg = chg as any; // pour accéder à chg.sourceServerItem si non typé
-            if (tokens.indexOf("rename") >= 0 && anyChg?.sourceServerItem && chg.item?.path) {
-              const oldPath = anyChg.sourceServerItem as string;
-              const newPath = chg.item.path as string;
-              oldToNew.set(oldPath, newPath);
-              newToOld.set(newPath, oldPath);
-            }
-          }
-        }
-
-        // 2e passe : agréger les fichiers & flags sur le CHEMIN FINAL, ignorer la voie "sourceRename"
-        for (const commitChanges of perCommitChanges) {
-          for (const chg of commitChanges) {
-            const p = chg?.item?.path;
-            if (!p || !isMd(p)) continue;
-
-            const tokensLower = splitFlags(chg.changeType);
-
-            // Ignorer l’entrée de l'ancien chemin portant "sourceRename" (ex: "delete, sourceRename")
-            if (tokensLower.indexOf("sourcerename") >= 0) {
-              continue;
-            }
-
-            // Résoudre le chemin final après éventuelles chaînes de rename
-            const finalPath = resolveFinalPath(p);
-
-            // Créer/mettre à jour l'entry (toujours comparer base <-> head)
-            const entry = byPath.get(finalPath) ?? ({
-              path: finalPath,
-              srcCommitId: headCommitId,
-              tgtCommitId: baseCommitId
-            } as MdFileItem);
-            entry.srcCommitId = headCommitId;
-            entry.tgtCommitId = baseCommitId;
-            byPath.set(finalPath, entry);
-
-            // Agréger les flags du changeType EXACTS tels que renvoyés par l'API
-            addFlags(finalPath, chg.changeType);
-          }
-        }
-
-        // Construire la table de lookup pour BASE (ancien chemin le plus ancien)
-        for (const newPath of newToOld.keys()) {
-          baseLookupPathByNewPath.set(newPath, resolveBasePathForNew(newPath));
-        }
-      } else {
-        // 🔁 Fallback : pas de commits listés → on retombe sur l'union base/head comme avant
-        const [filesSrcChgs, filesTgtChgs]: [Change[], Change[]] = await Promise.all([
-          this.azureAPIHelper.GetFilesChanges(headCommitId),
-          this.azureAPIHelper.GetFilesChanges(baseCommitId)
-        ]);
-
-        const union = [...filesSrcChgs, ...filesTgtChgs];
-
-        // 1ère passe : détecter renames à partir de l'union
-        for (const chg of union) {
+      // 1st : rename pairs (old -> new)
+      for (const commitChanges of perCommitChanges) {
+        for (const chg of commitChanges) {
           const tokens = splitFlags(chg.changeType);
+          // new path : sourceServerItem = old path
           const anyChg = chg as any;
           if (tokens.indexOf("rename") >= 0 && anyChg?.sourceServerItem && chg.item?.path) {
             const oldPath = anyChg.sourceServerItem as string;
@@ -212,59 +153,73 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
             newToOld.set(newPath, oldPath);
           }
         }
+      }
 
-        // 2e passe : agréger sur le chemin final, ignorer "sourceRename"
-        for (const chg of union) {
+      // 2nd : check files/flags of the final path (ignore "source rename")
+      for (const commitChanges of perCommitChanges) {
+        for (const chg of commitChanges) {
           const p = chg?.item?.path;
           if (!p || !isMd(p)) continue;
-          const tokensLower = splitFlags(chg.changeType);
-          if (tokensLower.indexOf("sourcerename") >= 0) continue;
 
+          const tokensLower = splitFlags(chg.changeType);
+
+          // Ignorer l’entrée de l'ancien chemin portant "sourceRename" (ex: "delete, sourceRename")
+          if (tokensLower.indexOf("sourcerename") >= 0) {
+            continue;
+          }
+
+          // Résoudre le chemin final après éventuelles chaînes de rename
           const finalPath = resolveFinalPath(p);
+
+          // Créer/mettre à jour l'entry (toujours comparer base <-> head)
           const entry = byPath.get(finalPath) ?? ({
             path: finalPath,
             srcCommitId: headCommitId,
             tgtCommitId: baseCommitId
           } as MdFileItem);
+          entry.srcCommitId = headCommitId;
+          entry.tgtCommitId = baseCommitId;
           byPath.set(finalPath, entry);
 
+          // Agréger les flags du changeType EXACTS tels que renvoyés par l'API
           addFlags(finalPath, chg.changeType);
-        }
-
-        for (const newPath of newToOld.keys()) {
-          baseLookupPathByNewPath.set(newPath, resolveBasePathForNew(newPath));
         }
       }
 
-      // --- 2) Charger les contenus aux DEUX commits pour le diff ---
+      // Build lookup table of new pathes
+      for (const newPath of newToOld.keys()) {
+        baseLookupPathByNewPath.set(newPath, resolveBasePathForNew(newPath));
+      }
+
+      // --- 2) Charger les contenus des DEUX commits pour le diff ---
       const items = Array.from(byPath.values());
 
       await Promise.all(
         items.map(async (it) => {
-          // BASE (target) : si rename, lire sur l'ANCIEN chemin initial
+          // BASE (target) : if rename, check old path / original path
           const baseLookupPath = baseLookupPathByNewPath.get(it.path) ?? it.path;
           try {
             it.tgtContent = await this.azureAPIHelper.GetFileContent(baseLookupPath, baseCommitId);
           } catch {
-            it.tgtContent = ""; // n'existe pas à base
+            it.tgtContent = ""; // not found in the base
           }
 
-          // HEAD (source) : lire sur le NOUVEAU chemin (final)
+          // HEAD (source) : read the new path (final)
           try {
             it.srcContent = await this.azureAPIHelper.GetFileContent(it.path, headCommitId);
           } catch {
-            it.srcContent = ""; // n'existe pas à head
+            it.srcContent = ""; // not found in the head
           }
         })
       );
 
-      // --- 3) Poser le status = concat EXACTE des changeType agrégés sur l'ensemble des commits ---
+      // --- 3) Status
       for (const it of items) {
         const flags = flagsByPath.get(it.path);
         it.status = flags && flags.size > 0 ? Array.from(flags.values()).join(", ") : "";
       }
 
-      // --- 4) État & 1ère sélection ---
+      // --- Set State ---
       this.setState(
         {
           files: items.sort((a, b) => a.path.localeCompare(b.path)),
@@ -283,7 +238,6 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
     }
   }
 
-  /** Diff HTML sur le rendu Markdown : BASE -> HEAD (ajouts en <ins>, suppressions en <del>) */
   private buildDiffHtml(baseContent: string, headContent: string): string {
     const htmlBase = this.md.render(baseContent ?? "");
     const htmlHead = this.md.render(headContent ?? "");
@@ -324,20 +278,19 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
 
   private toKebab(s: string): string {
     return s
-      .replace(/([a-z0-9])([A-Z])/g, "$1-$2") // camelCase -> camel-Case
-      .replace(/[^a-z0-9]+/gi, "-")           // autres séparateurs -> -
-      .replace(/^-+|-+$/g, "")                // trim des -
+      .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
       .toLowerCase();
   }
 
   private buildStatusClass(status?: string): string {
     if (!status) return "status-badge";
     const tokens = status
-      .split(/[,\s]+/)       // split sur virgule(s) et/ou espaces
+      .split(/[,\s]+/)
       .map(t => t.trim())
       .filter(Boolean);
 
-    // déduplication en conservant l'ordre
     const uniq: string[] = [];
     const seen = new Set<string>();
     for (const t of tokens) {
@@ -408,7 +361,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
 
         {files.length > 0 && (
           <div className={`pr-md-preview__layout ${panelShown}`}>
-            {/* Panneau gauche : liste de fichiers */}
+            {/* Left Panel : files list*/}
             {panelShown && (
               <aside className="pr-md-preview__left">
                 <div className="pr-md-preview__left__header">
@@ -430,7 +383,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
                         onClick={() => this.computeAndSetDiff(f.path)}
                         title={f.path}
                       >
-                        {/* status = concat des changeType agrégés (ex: "rename, edit") */}
+                        {/* status = ex: "rename, edit" */}
                         <span className={this.buildStatusClass(f.status)}>
                           {f.status}
                         </span>
@@ -442,7 +395,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
               </aside>
             )}
 
-            {/* Zone droite : preview avec diff */}
+            {/* Right panel : Diff */}
             <main className="pr-md-preview__right">
               {selectedPath ? (
                 <>
@@ -457,7 +410,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
                     />
                   ) : (
                     <div className="pr-md-preview__split">
-                      {/* Avant (cache <ins>) */}
+                      {/* Sub Left */}
                       <section className="pr-md-preview__pane pane-left">
                         <div className="pr-md-preview__subheader">{t("right.before")}</div>
                         <div
@@ -468,7 +421,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
                         />
                       </section>
 
-                      {/* Après (cache <del>) */}
+                      {/* Sub Right */}
                       <section className="pr-md-preview__pane pane-right">
                         <div className="pr-md-preview__subheader">{t("right.after")}</div>
                         <div
