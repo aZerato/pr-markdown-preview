@@ -14,12 +14,19 @@ module.exports = {
   entry: entries,
   devtool: "inline-source-map",
   output: {
-    filename: "[name]/[name].js"
+    filename: "[name]/[name].js",
+    path: path.resolve(__dirname, 'dist')
   },
   mode: 'development',
   devServer: {
     https: true,
     port: 3000,
+    open: true,
+    static:{
+      directory: path.resolve(__dirname, 'dist'),
+      publicPath: '/dist',
+    },
+    hot: true,
   },
   plugins: [
     new CopyWebpackPlugin({
