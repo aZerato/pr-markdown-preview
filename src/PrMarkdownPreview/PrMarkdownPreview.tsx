@@ -46,7 +46,6 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
   private rightPaneRef = React.createRef<HTMLDivElement>();
   private previewLeftRef = React.createRef<HTMLDivElement>();
   private previewRightRef = React.createRef<HTMLDivElement>();
-  private isSyncing = false;
 
   constructor(props: WithTranslation) {
     super(props);
@@ -66,18 +65,29 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
   }
   
   public componentDidUpdate(prevProps: any, prevState: IPrMarkdownPreviewState) {
-    if (
+    const htmlChanged =
       prevState.previewLeftHtml !== this.state.previewLeftHtml ||
-      prevState.previewRightHtml !== this.state.previewRightHtml
-    ) {
-      if (this.state.viewMode === "split") {
-        this.applyDiffToPreviews();
-      }
+      prevState.previewRightHtml !== this.state.previewRightHtml;
+
+    const modeChanged = prevState.viewMode !== this.state.viewMode;
+
+    if ((htmlChanged || modeChanged) && this.state.viewMode === "split") {
+      this.applyDiffSafely();
     }
 
-    if (prevState.viewMode !== this.state.viewMode && this.state.selectedPath) {
+    if (modeChanged && this.state.selectedPath) {
       this.computeAndSetDiff(this.state.selectedPath);
     }
+  }
+
+  private applyDiffSafely() {
+    if (this.state.viewMode !== "split") return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.applyDiffToPreviews();
+      });
+    });
   }
 
   private escapeHtml(s: string) {
@@ -99,59 +109,87 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
   }
 
   private isSimpleTextBlock(el: HTMLElement) {
-    const children = Array.from(el.childNodes).filter(n => n.nodeType === Node.ELEMENT_NODE);
-    return children.length === 0 || children.every(ch => ch.nodeName.toLowerCase() === 'br');
+    const tag = el.tagName.toLowerCase();
+
+    // blocs complexes à exclure
+    const complexTags = ["ul", "ol", "table", "thead", "tbody", "tr", "pre", "code"];
+    if (complexTags.findIndex(t => t === tag) !== -1) return false;
+
+    // enfants complexes
+    const hasComplexChildren = Array.from(el.children).some(
+      c => ["code", "pre", "img", "table", "ul", "ol"].findIndex(t => t === c.tagName.toLowerCase()) !== -1
+    );
+
+    if (hasComplexChildren) return false;
+
+    return true;
   }
 
   private applyWordDiffToSimplePair(L: HTMLElement, R: HTMLElement, options: any) {
-    L.classList.add('mkdiff-line-modified');
-    R.classList.add('mkdiff-line-modified');
+    const isInline = this.state.viewMode === "inline";
 
-    const oldText = R.textContent || ''; // BASE
-    const newText = L.textContent || ''; // HEAD
+    const oldText = R.textContent || ""; // BEFORE
+    const newText = L.textContent || ""; // AFTER
 
     const parts = Diff.diffWordsWithSpace(oldText, newText);
 
-    let htmlLeft = '', htmlRight = '';
+    let htmlLeft = "";
+    let htmlRight = "";
 
     for (const part of parts) {
       const v = part.value;
 
       if (options.ignoreWs && /^\s+$/.test(v)) {
-        htmlLeft  += this.escapeHtml(v);
+        htmlLeft += this.escapeHtml(v);
         htmlRight += this.escapeHtml(v);
         continue;
       }
 
-      if (part.added) {
-        // NEW → visible à gauche
-        htmlLeft  += `<span class="mkdiff-w-add">${this.escapeHtml(v)}</span>`;
-        htmlRight += ``; // rien côté base
+      // ===== INLINE MODE (GitHub-like) =====
+      if (isInline) {
+        if (part.added) {
+          htmlLeft += `<span class="gh-add" title="Added">${this.escapeHtml(v)}</span>`;
+        } 
+        else if (part.removed) {
+          htmlLeft += `<span class="gh-del" title="Removed: ${this.escapeHtml(v)}">${this.escapeHtml(v)}</span>`;
+        } 
+        else {
+          htmlLeft += this.escapeHtml(v);
+        }
       } 
-      else if (part.removed) {
-        // OLD → visible à droite
-        htmlLeft  += ``;
-        htmlRight += `<span class="mkdiff-w-del">${this.escapeHtml(v)}</span>`;
-      } 
+      // ===== SPLIT MODE =====
       else {
-        htmlLeft  += this.escapeHtml(v);
-        htmlRight += this.escapeHtml(v);
+        if (part.added) {
+          htmlLeft += `<span class="mkdiff-w-add">${this.escapeHtml(v)}</span>`;
+        } 
+        else if (part.removed) {
+          htmlRight += `<span class="mkdiff-w-del">${this.escapeHtml(v)}</span>`;
+        } 
+        else {
+          htmlLeft += this.escapeHtml(v);
+          htmlRight += this.escapeHtml(v);
+        }
       }
     }
 
-    L.innerHTML = htmlLeft;
-    R.innerHTML = htmlRight;
+    if (isInline) {
+      L.innerHTML = htmlLeft;
+      L.classList.add("gh-line-modified");
+    } else {
+      L.innerHTML = htmlLeft;
+      R.innerHTML = htmlRight;
+      L.classList.add("mkdiff-line-modified");
+      R.classList.add("mkdiff-line-modified");
+    }
   }
 
   private applyDiffToPreviews() {
-    const isInline = this.state.viewMode === "inline";
-
-    const leftRoot = this.previewLeftRef.current;
-    const rightRoot = isInline
-      ? this.previewLeftRef.current
-      : this.previewRightRef.current;
+    const leftRoot = this.previewLeftRef.current;   // AFTER
+    const rightRoot = this.previewRightRef.current; // BEFORE
 
     if (!leftRoot || !rightRoot) return;
+
+    const isInline = this.state.viewMode === "inline";
 
     const options = {
       ignoreWs: true,
@@ -176,21 +214,14 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
     const tokenize = (s: string) =>
       (s.toLowerCase().match(/\w+/g) || []).filter(w => w.length >= 2);
 
-    const similarity = (a: string[], b: string[]) => {
-      const A = new Set(a);
-      const B = new Set(b);
-      let inter = 0;
-      A.forEach(x => { if (B.has(x)) inter++; });
-      return (2 * inter) / (A.size + B.size || 1);
-    };
-
-    // --- reset classes
     const clean = (root: HTMLElement) => {
-      root.querySelectorAll("[class*='mkdiff']").forEach(el => {
+      root.querySelectorAll("[class*='mkdiff'], [class*='gh-']").forEach(el => {
         el.classList.remove(
           "mkdiff-line-added",
           "mkdiff-line-removed",
-          "mkdiff-line-modified"
+          "mkdiff-line-modified",
+          "gh-line-modified",
+          "gh-block-modified"
         );
       });
     };
@@ -208,24 +239,23 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
 
     const rightMeta = rightNodes.map(n => ({
       node: n,
-      tag: n.tagName.toLowerCase(),      text: n.textContent || "",
+      tag: n.tagName.toLowerCase(),
+      text: n.textContent || "",
       key: normalize(n.textContent || ""),
       tokens: tokenize(n.textContent || "")
     }));
 
-    // --- matching simple
-    const leftSigs  = leftMeta.map(m => `${m.tag}|${m.key}`);
+    const leftSigs = leftMeta.map(m => `${m.tag}|${m.key}`);
     const rightSigs = rightMeta.map(m => `${m.tag}|${m.key}`);
 
-    const chunks = Diff.diffArrays(rightSigs, leftSigs, { comparator: (a,b) => a === b });
+    const chunks = Diff.diffArrays(rightSigs, leftSigs, { comparator: (a, b) => a === b });
 
-    // Parcours des chunks avec appariement “removed + added” intelligent
     let iR = 0, iL = 0;
+
     for (let idx = 0; idx < chunks.length; idx++) {
       const c = chunks[idx];
 
       if (!c.added && !c.removed) {
-        // communs
         iR += c.value.length;
         iL += c.value.length;
         continue;
@@ -235,33 +265,30 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
         const next = chunks[idx + 1];
 
         if (next && next.added) {
-          // Candidats à la modification
           const remLen = c.value.length;
           const addLen = next.value.length;
 
-          const remIdx = Array.from({length: remLen}, (_,k) => iR + k);
-          const addIdx = Array.from({length: addLen}, (_,k) => iL + k);
+          const remIdx = Array.from({ length: remLen }, (_, k) => iR + k);
+          const addIdx = Array.from({ length: addLen }, (_, k) => iL + k);
 
-          // Appariement par similarité tokens (avec seuils & garde-fous)
           const takenR = new Set();
           const takenL = new Set();
 
-          // strat: pour chaque "added" (LEFT), trouver "removed" (RIGHT) le plus similaire
           for (const li of addIdx) {
             const Lm = leftMeta[li];
-            const addChars = Lm.key.length;
-
-            // micro-ajouts (ex. "d") -> ne PAS matcher; laisse en "added" isolé
-            if (addChars < this.SHORT_ADD_CHAR) continue;
 
             let best = { score: -1, ri: -1 };
+
             for (const ri of remIdx) {
               if (takenR.has(ri)) continue;
+
               const Rm = rightMeta[ri];
 
               const score = this.similarityTokens(Lm.tokens, Rm.tokens);
               const sameTag = (Lm.tag === Rm.tag);
-              const pass = sameTag ? (score >= this.SAME_TAG_THRESHOLD) : (score >= this.DIFF_TAG_THRESHOLD);
+              const pass = sameTag
+                ? (score >= this.SAME_TAG_THRESHOLD)
+                : (score >= this.DIFF_TAG_THRESHOLD);
 
               if (pass && score > best.score) {
                 best = { score, ri };
@@ -269,7 +296,6 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
             }
 
             if (best.ri !== -1) {
-              // On a un couple modifié
               takenL.add(li);
               takenR.add(best.ri);
 
@@ -279,24 +305,35 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
               if (this.isSimpleTextBlock(Lnode) && this.isSimpleTextBlock(Rnode)) {
                 this.applyWordDiffToSimplePair(Lnode, Rnode, options);
               } else {
-                Lnode.classList.add('mkdiff-line-modified');
-                Rnode.classList.add('mkdiff-line-modified');
+                Lnode.classList.add("gh-block-modified");
               }
             }
           }
 
-          // Restes non appariés -> lignes ajoutées/supprimées
-          for (const ri of remIdx) if (!takenR.has(ri)) rightMeta[ri].node.classList.add('mkdiff-line-removed');
-          for (const li of addIdx) if (!takenL.has(li))  leftMeta[li].node.classList.add('mkdiff-line-added');
+          for (const li of addIdx) {
+            if (!takenL.has(li)) {
+              const node = leftMeta[li].node;
+              node.classList.add("mkdiff-line-added");
+            }
+          }
+
+          if (!isInline) {
+            for (const ri of remIdx) {
+              if (!takenR.has(ri)) {
+                const node = rightMeta[ri].node;
+                node.classList.add("mkdiff-line-removed");
+              }
+            }
+          }
 
           iR += remLen;
           iL += addLen;
-          idx++; // on saute aussi le chunk "added"
+          idx++;
         } else {
-          // seulement des suppressions
-          for (let t = 0; t < c.value.length; t++) {
-            const Rnode = rightMeta[iR + t]?.node;
-            if (Rnode) Rnode.classList.add('mkdiff-line-removed');
+          if (!isInline) {
+            for (let t = 0; t < c.value.length; t++) {
+              rightMeta[iR + t]?.node.classList.add("mkdiff-line-removed");
+            }
           }
           iR += c.value.length;
         }
@@ -305,14 +342,36 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
       }
 
       if (c.added) {
-        // seulement des ajouts
         for (let t = 0; t < c.value.length; t++) {
-          const Lnode = leftMeta[iL + t]?.node;
-          if (Lnode) Lnode.classList.add('mkdiff-line-added');
+          leftMeta[iL + t]?.node.classList.add("mkdiff-line-added");
         }
         iL += c.value.length;
       }
     }
+  }
+
+  private setupScrollSync() {
+    const left = this.leftPaneRef.current;
+    const right = this.rightPaneRef.current;
+
+    if (!left || !right) return;
+
+    let isSyncing = false;
+
+    const sync = (from: HTMLElement, to: HTMLElement) => {
+      if (isSyncing) return;
+      isSyncing = true;
+
+      const ratio = from.scrollTop / (from.scrollHeight - from.clientHeight);
+      to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
+
+      requestAnimationFrame(() => {
+        isSyncing = false;
+      });
+    };
+
+    left.addEventListener("scroll", () => sync(left, right));
+    right.addEventListener("scroll", () => sync(right, left));
   }
 
   public async componentDidMount() {
@@ -490,6 +549,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
           selectedPath: items.length ? items[0].path : undefined
         },
         () => {
+          this.setupScrollSync();
           if (this.state.selectedPath) {
             this.computeAndSetDiff(this.state.selectedPath!);
           }
@@ -547,18 +607,16 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
     );
 
     this.setState(
-      {
-        diffHtml: result.diffHtml,
-        previewLeftHtml: result.previewLeftHtml,
-        previewRightHtml: result.previewRightHtml,
-        selectedPath: path
-      },
-      () => {
-        if (this.state.viewMode === "split") {
-          this.applyDiffToPreviews();
-        }
-      }
-    );
+    {
+      diffHtml: result.diffHtml,
+      previewLeftHtml: result.previewLeftHtml,
+      previewRightHtml: result.previewRightHtml,
+      selectedPath: path
+    },
+    () => {
+      this.applyDiffSafely(); // 🔥 au lieu de applyDiffToPreviews
+    }
+  );
   }
 
   private setViewMode(mode: "inline" | "split") {
@@ -566,21 +624,6 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
       this.leftPaneRef.current?.scrollTo(0, 0);
       this.rightPaneRef.current?.scrollTo(0, 0);
     });
-  }
-
-  private syncScroll(source: "left" | "right") {
-    if (this.isSyncing) return;
-    const left = this.leftPaneRef.current;
-    const right = this.rightPaneRef.current;
-    if (!left || !right) return;
-
-    const from = source === "left" ? left : right;
-    const to = source === "left" ? right : left;
-
-    const ratio = from.scrollTop / Math.max(1, from.scrollHeight - from.clientHeight);
-    this.isSyncing = true;
-    to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
-    this.isSyncing = false;
   }
 
   private toKebab(s: string): string {
@@ -610,19 +653,6 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
 
     const classes = ["status-badge", ...uniq.map(t => `status-${this.toKebab(t)}`)];
     return classes.join(" ");
-  }
-
-  private formatHtmlForDiff(html: string): string {
-    return html
-      // retour à la ligne entre les blocs
-      .replace(/></g, ">\n<")
-
-      // optionnel : forcer certains blocs à être isolés
-      .replace(/<(h[1-6]|p|li|blockquote|table|tr|pre|code)/g, "\n<$1")
-      .replace(/<\/(h[1-6]|p|li|blockquote|table|tr|pre|code)>/g, "</$1>\n")
-
-      .replace(/\n{2,}/g, "\n")
-      .trim();
   }
 
   public render(): JSX.Element {
@@ -726,64 +756,36 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
                     {selectedPath} — {this.state.viewMode === "inline" ? t("view.inline") : t("view.split")}
                   </div>
 
-                  {/* ===== SPLIT MODE ===== */}
-                  {this.state.viewMode === "split" && (
-                    <>
-                      {/* PREVIEW ZONE */}
-                      <div className="preview-zone">
-                        
-                        <div className="preview-pane">
-                          <div className="preview-header">{t("right.before")}</div>
-                          <div
-                            key={`left-${this.state.selectedPath}-${this.state.viewMode}`}
-                            ref={this.previewRightRef}
-                            className="preview-content md-typeset"
-                            dangerouslySetInnerHTML={{ __html: this.state.previewRightHtml ?? "" }}
-                          />
-                        </div>
-
-                        <div className="preview-pane">
-                          <div className="preview-header">{t("right.after")}</div>
-                          <div
-                            key={`right-${this.state.selectedPath}-${this.state.viewMode}`}
-                            ref={this.previewLeftRef}
-                            className="preview-content md-typeset"
-                            dangerouslySetInnerHTML={{ __html: this.state.previewLeftHtml ?? "" }}
-                          />
-                        </div>
-
-                      </div>
-
-                      {/* DIFF ZONE */}
-                      <div className="diff-zone">
-                        <div
-                          dangerouslySetInnerHTML={{ __html: diffHtml ?? "" }}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {/* ===== INLINE MODE ===== */}
-                  {this.state.viewMode === "inline" && (
-                    <div className="preview-inline">
-                      <div className="preview-pane">
-                        <div className="preview-header">{t("right.inline")}</div>
-
-                        <div
-                          ref={this.previewLeftRef}
-                          className="preview-content md-typeset"
-                          dangerouslySetInnerHTML={{ __html: this.state.previewLeftHtml ?? "" }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {this.state.viewMode === "inline" && (
-                    <div className="diff-zone">
+                  {/* PREVIEW ZONE */}
+                  <div className="preview-zone">
+                    
+                    <div className="preview-pane"
+                        style={{ display: this.state.viewMode === "inline" ? "none" : "block" }}>
+                      <div className="preview-header">{t("right.before")}</div>
                       <div
-                        dangerouslySetInnerHTML={{ __html: diffHtml ?? "" }}
+                        ref={this.previewRightRef}
+                        className="preview-content md-typeset"
+                        dangerouslySetInnerHTML={{ __html: this.state.previewRightHtml ?? "" }}
                       />
                     </div>
-                  )}
+                    
+                    <div className="preview-pane">
+                      <div className="preview-header">{t("right.after")}</div>
+                      <div
+                        ref={this.previewLeftRef}
+                        className="preview-content md-typeset"
+                        dangerouslySetInnerHTML={{ __html: this.state.previewLeftHtml ?? "" }}
+                      />
+                    </div>
+
+                  </div>
+
+                  {/* DIFF ZONE */}
+                  <div className="diff-zone">
+                    <div
+                      dangerouslySetInnerHTML={{ __html: diffHtml ?? "" }}
+                    />
+                  </div>
 
                 </>
               ) : (
