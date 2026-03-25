@@ -10,6 +10,6 @@
   "select.prompt": "Select a file to preview.",
   "view.closepanel": "Close side panel",
   "view.openpanel": "Open side panel",
-  "view.inline": "Inline",
+  "view.inline": "Head",
   "view.split": "Side by side"
 }

@@ -10,6 +10,6 @@
   "select.prompt": "Sélectionnez un fichier pour voir la prévisualisation.",
   "view.closepanel": "Fermer le panneau",
   "view.openpanel": "Ouvrir le panneau",
-  "view.inline": "Inline",
+  "view.inline": "Tête (final)",
   "view.split": "Côte à côte"
 }
