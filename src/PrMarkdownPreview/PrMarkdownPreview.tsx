@@ -38,7 +38,6 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
   azureAPIHelper: AzureAPIHelper;
   azurePrConfig: AzurePrConfig;
 
-  private SHORT_ADD_CHAR = 3;
   private SAME_TAG_THRESHOLD = 0.50;
   private DIFF_TAG_THRESHOLD = 0.72; 
 
@@ -84,9 +83,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
     if (this.state.viewMode !== "split") return;
 
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        this.applyDiffToPreviews();
-      });
+      this.applyDiffToPreviews();
     });
   }
 
@@ -485,15 +482,14 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
 
           const tokensLower = splitFlags(chg.changeType);
 
-          // Ignorer l’entrée de l'ancien chemin portant "sourceRename" (ex: "delete, sourceRename")
+          // ignore sourceRename entry (ex: "delete, sourceRename")
           if (tokensLower.indexOf("sourcerename") >= 0) {
             continue;
           }
 
-          // Résoudre le chemin final après éventuelles chaînes de rename
           const finalPath = resolveFinalPath(p);
 
-          // Créer/mettre à jour l'entry (toujours comparer base <-> head)
+          // create/update entry (compare base <-> head)
           const entry = byPath.get(finalPath) ?? ({
             path: finalPath,
             srcCommitId: headCommitId,
@@ -503,7 +499,6 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
           entry.tgtCommitId = baseCommitId;
           byPath.set(finalPath, entry);
 
-          // Agréger les flags du changeType EXACTS tels que renvoyés par l'API
           addFlags(finalPath, chg.changeType);
         }
       }
@@ -513,7 +508,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
         baseLookupPathByNewPath.set(newPath, resolveBasePathForNew(newPath));
       }
 
-      // --- 2) Charger les contenus des DEUX commits pour le diff ---
+      // --- 2) Load the two "opposites" commits ---
       const items = Array.from(byPath.values());
 
       await Promise.all(
@@ -567,11 +562,9 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
       ignoreCase: false
     };
 
-    // ===== PREVIEW (TOUJOURS HTML PROPRE) =====
     const rawHtmlLeft = DOMPurify.sanitize(await marked.parse(headContent ?? ""));
     const rawHtmlRight = DOMPurify.sanitize(await marked.parse(baseContent ?? ""));
 
-    // ===== DIFF SUR MARKDOWN (🔥 CORRECT) =====
     const patch = Diff.createTwoFilesPatch(
       "before.md",
       "after.md",
@@ -614,7 +607,7 @@ class PrMarkdownPreview extends React.Component<WithTranslation, IPrMarkdownPrev
       selectedPath: path
     },
     () => {
-      this.applyDiffSafely(); // 🔥 au lieu de applyDiffToPreviews
+      this.applyDiffSafely();
     }
   );
   }
