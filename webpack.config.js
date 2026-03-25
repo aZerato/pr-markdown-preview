@@ -2,7 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
-const IGNORED = new Set(["i18n"]);
+const IGNORED = new Set(["i18n", "types"]);
 
 const entries = fs
   .readdirSync(path.join(__dirname, "src"))
@@ -14,12 +14,21 @@ module.exports = {
   entry: entries,
   devtool: "inline-source-map",
   output: {
-    filename: "[name]/[name].js"
+    filename: "[name]/[name].js",
+    path: path.resolve(__dirname, 'dist')
   },
   mode: 'development',
   devServer: {
     https: true,
     port: 3000,
+    open: true,
+    static: {    
+      publicPath: '/'
+    },
+    devMiddleware: {
+      publicPath: '/dist'
+    },
+    hot: true
   },
   plugins: [
     new CopyWebpackPlugin({
@@ -27,6 +36,7 @@ module.exports = {
     }),
   ],
   module: {
+    exprContextCritical: false,
     rules: [
       {
         test: /\.(ts|tsx)$/i,

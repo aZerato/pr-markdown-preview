@@ -16,7 +16,7 @@
 .pr-md-preview__layout {
   display: grid;
   grid-template-columns: 320px 1fr;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 70px);
   gap: 12px;
   padding: 12px;
   box-sizing: border-box;
@@ -244,4 +244,221 @@
 }
 .theme-dark .md-diff del {
   background: rgba(197, 15, 31, 0.25);
+}
+.mkdiff-line-added {
+  background: rgba(46,160,67, .10);
+  box-shadow: inset 3px 0 0 rgba(46,160,67,.55);
+}
+
+.mkdiff-line-removed {
+  background: rgba(248,81,73,.12);
+  box-shadow: inset 3px 0 0 rgba(248,81,73,.55);
+}
+
+.mkdiff-line-modified {
+  background: rgba(219,171, 9,.12);
+  box-shadow: inset 3px 0 0 rgba(219,171, 9,.55);
+}
+
+.mkdiff-w-add {
+  background: rgba(46,160,67,.35);
+}
+
+.mkdiff-w-del {
+  background: rgba(248,81,73,.35);
+  text-decoration: line-through;
+}
+
+.pr-md-preview__previews {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.preview-pane {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.preview-header {
+  padding: 0.5rem;
+  font-weight: 600;
+  background: rgba(0,0,0,0.05);
+  border-bottom: 1px solid #ddd;
+}
+
+.preview-content {
+  padding: 0.8rem;
+}
+
+/* ===== Markdown base ===== */
+.md-typeset {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #24292f;
+}
+
+/* ===== Headings ===== */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.md-typeset h1 { font-size: 2em; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
+.md-typeset h2 { font-size: 1.5em; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3em; }
+.md-typeset h3 { font-size: 1.25em; }
+
+.md-typeset h4 { font-size: 1em; }
+.md-typeset h5 { font-size: 0.875em; }
+.md-typeset h6 { font-size: 0.85em; color: #57606a; }
+
+/* ===== Paragraphs ===== */
+.md-typeset p {
+  margin: 0.5em 0;
+}
+
+/* ===== Lists ===== */
+.md-typeset ul,
+.md-typeset ol {
+  padding-left: 2em;
+  margin: 0.5em 0;
+}
+
+.md-typeset li {
+  margin: 0.25em 0;
+}
+
+/* ===== Blockquote ===== */
+.md-typeset blockquote {
+  border-left: 4px solid #d0d7de;
+  padding: 0 1em;
+  color: #57606a;
+  margin: 1em 0;
+}
+
+/* ===== Code ===== */
+.md-typeset code {
+  background-color: #f6f8fa;
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+  font-size: 85%;
+}
+
+.md-typeset pre {
+  background-color: #f6f8fa;
+  padding: 1em;
+  overflow: auto;
+  border-radius: 6px;
+}
+
+.md-typeset pre code {
+  background: none;
+  padding: 0;
+}
+
+/* ===== Tables ===== */
+.md-typeset table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+}
+
+.md-typeset th,
+.md-typeset td {
+  border: 1px solid #d0d7de;
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.md-typeset thead {
+  background-color: #f6f8fa;
+}
+
+.md-typeset tr:nth-child(even) {
+  background-color: #fafbfc;
+}
+
+/* ===== Horizontal rule ===== */
+.md-typeset hr {
+  border: none;
+  border-top: 1px solid #d0d7de;
+  margin: 1.5em 0;
+}
+
+/* ===== Images ===== */
+.md-typeset img {
+  max-width: 100%;
+}
+
+/* ===== Links ===== */
+.md-typeset a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+.md-typeset a:hover {
+  text-decoration: underline;
+}
+
+/* ===== Diff highlight (ton système) ===== */
+.mkdiff-line-added {
+  background-color: #e6ffec;
+}
+
+.mkdiff-line-removed {
+  background-color: #ffebe9;
+}
+
+.mkdiff-line-modified {
+  background-color: #fff8c5;
+}
+
+.mkdiff-w-add {
+  background-color: #acf2bd;
+}
+
+.mkdiff-w-del {
+  background-color: #ffcecb;
+  text-decoration: line-through;
+}
+
+/* séparation visuelle */
+.preview-zone {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.preview-pane {
+  flex: 1;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.preview-header {
+  padding: 6px 10px;
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+/* 🔥 ZONE DIFF ISOLÉE */
+.diff-zone {
+  margin-top: 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  overflow: auto;
+  padding: 8px;
+}
+.d2h-diff-table {
+  position: relative;
 }
