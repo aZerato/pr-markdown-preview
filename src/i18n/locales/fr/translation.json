@@ -3,6 +3,7 @@
   "left.title": "Fichiers Markdown",
   "right.before": "Avant (cible)",
   "right.after": "Après (source)",
+  "right.inline": "Différences ligne par ligne",
   "loading": "Chargement des fichiers Markdown de la PR…",
   "error.title": "Erreur lors du chargement",
   "empty": "Aucun fichier Markdown dans cette PR.",

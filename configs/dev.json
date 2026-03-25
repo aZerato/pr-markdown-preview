@@ -1,5 +1,5 @@
 {
-  "id": "pr-markdown-preview",
+  "id": "pr-markdown-preview-dev",
   "public": false,
-  "baseUri": "https://localhost:3000"
+  "baseUri": "https://localhost:3000/dist"
 }
