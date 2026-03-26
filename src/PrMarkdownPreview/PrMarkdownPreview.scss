@@ -1,85 +1,100 @@
 @use "../../node_modules/azure-devops-ui/Core/_platformCommon.scss";
 
-// 1. Var
+/* Root layout for the extension to take full space */
+#root {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Base status colors */
 :root {
-  --status-edit-color: var(--palette-neutral-60, #666);
-  --status-add-color: var(--palette-success-main, #107c10);
-  --status-rename-color: var(--communication-foreground, #005fb8);
-  --status-delete-color: var(--palette-error-main, #c50f1f);
-  
-  // diff colors
-  --diff-add-bg: rgba(46, 160, 67, 0.15);
-  --diff-add-word: rgba(46, 160, 67, 0.4);
-  --diff-del-bg: rgba(248, 81, 73, 0.15);
-  --diff-del-word: rgba(248, 81, 73, 0.4);
-  --diff-mod-bg: rgba(219, 171, 9, 0.15);
+  --status-edit-color:   #6b6b6b;
+  --status-add-color:    #107c10;
+  --status-rename-color: #005fb8;
+  --status-delete-color: #c50f1f;
 }
 
-// 2. Main layout
+/* Main Layout - Forces full width and height */
 .pr-md-preview__layout {
-  display: grid;
-  height: calc(100vh - 100px);
-  gap: 16px;
-  padding: 16px;
-  grid-template-columns: 1fr;
-
-  &.panel-open {
-    grid-template-columns: 300px 1fr;
-  }
+  display: flex; // Changed to flex for better full-width reliability
+  width: 100%;
+  height: calc(100vh - 100px); 
+  gap: 12px;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
-// 3. Sidebar (files list)
+/* Left Sidebar (File List) */
 .pr-md-preview__left {
-  border-right: 1px solid var(--palette-neutral-8, #eee);
+  width: 320px;
+  min-width: 320px;
+  border-right: 1px solid var(--palette-neutral-8, #e1e1e1);
   overflow-y: auto;
-  background: var(--background-color, #fff);
+  display: block;
 
-  .pr-md-preview__filelist {
-    margin: 0; padding: 0; list-style: none;
+  &.hidden { display: none; }
+}
 
-    .pr-md-preview__fileitem {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 12px;
-      cursor: pointer;
-      border-bottom: 1px solid var(--palette-neutral-4, #f4f4f4);
-      font-size: 13px;
+/* File List styling */
+.pr-md-preview__filelist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
-      &:hover { background: var(--palette-neutral-2, #fafafa); }
-      &.is-selected { 
-        background: var(--component-grid-selected-row-color, #eff6fc);
-        font-weight: 600;
-      }
-      .path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    }
+.pr-md-preview__fileitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--palette-neutral-4, #f4f4f4);
+
+  &:hover { background: var(--palette-neutral-2, #f9f9f9); }
+  &.is-selected { background: var(--palette-neutral-4, #f0f0f0); font-weight: 600; }
+
+  .path {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
-// 4. Status badges
+/* Status Badges Logic */
 .status-badge {
-  font-size: 10px; font-weight: 700;
+  display: inline-block;
   text-transform: uppercase;
-  padding: 2px 6px;
+  font-size: 10px;
   border-radius: 4px;
+  padding: 2px 6px;
   border: 1px solid currentColor;
-
-  &.status-add, &.status-added { color: var(--status-add-color); }
-  &.status-edit, &.status-modified { color: var(--status-edit-color); }
-  &.status-delete, &.status-deleted { color: var(--status-delete-color); }
-  &.status-rename { color: var(--status-rename-color); }
 }
 
-// 5. Previews (Panes)
+.status-badge.status-add, .status-badge.status-added { color: var(--status-add-color); }
+.status-badge.status-edit, .status-badge.status-modified { color: var(--status-edit-color); }
+.status-badge.status-rename { color: var(--status-rename-color); }
+.status-badge.status-delete, .status-badge.status-deleted { color: var(--status-delete-color); }
+
+/* Right Content Area */
 .pr-md-preview__right {
-  display: flex; flex-direction: column; gap: 16px;
+  flex-grow: 1; // Take all remaining space
+  min-width: 0; // Prevent flex item from overflowing
   overflow-y: auto;
+  position: relative;
 }
 
+/* Preview Zone (Split View) */
 .preview-zone {
-  display: flex; gap: 12px;
-  min-height: 50%;
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  width: 100%;
 
   .preview-pane {
-    flex: 1; display: flex; flex-direction: column;
+    flex: 1; // Equal width for both panes
+    min-width: 0;
     border: 1px solid var(--palette-neutral-10, #ddd);
     border-radius: 4px;
     background: var(--background-color, #fff);
@@ -88,44 +103,44 @@
       padding: 8px 12px;
       background: var(--palette-neutral-2, #f5f5f5);
       border-bottom: 1px solid var(--palette-neutral-10, #ddd);
-      font-size: 12px; font-weight: 600;
+      font-weight: 600;
     }
 
-    .preview-content { padding: 16px; overflow: auto; }
+    .preview-content { padding: 16px; }
   }
 }
 
-// 6. Markdown styles (md-typeset)
+/* Markdown Typography */
 .md-typeset {
-  color: var(--text-primary-color, #24292f);
-  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   font-size: 14px;
-
-  h1, h2, h3 { border-bottom: 1px solid var(--palette-neutral-8); padding-bottom: 0.3em; margin-top: 1.2em; }
-  code { background: var(--palette-neutral-4); padding: 0.2em 0.4em; border-radius: 3px; }
-  pre { background: var(--palette-neutral-4); padding: 12px; border-radius: 6px; overflow: auto; }
-  table { width: 100%; border-collapse: collapse; th, td { border: 1px solid var(--palette-neutral-10); padding: 6px 10px; } }
-  blockquote { border-left: 4px solid var(--palette-neutral-20); padding-left: 1em; color: var(--text-secondary-color); }
+  line-height: 1.6;
+  
+  h1, h2, h3 { border-bottom: 1px solid var(--palette-neutral-8); padding-bottom: 0.3em; }
+  table { width: 100%; border-collapse: collapse; th, td { border: 1px solid #ddd; padding: 6px; } }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow: auto; }
+  code { background: rgba(175, 184, 193, 0.2); padding: 0.2em 0.4em; border-radius: 4px; }
 }
 
-// 7. Unified colors for diff
-.mkdiff-line-added { background-color: var(--diff-add-bg) !important; box-shadow: inset 3px 0 0 var(--status-add-color); }
-.mkdiff-line-removed { background-color: var(--diff-del-bg) !important; box-shadow: inset 3px 0 0 var(--status-delete-color); }
-.mkdiff-line-modified, .gh-block-modified { background-color: var(--diff-mod-bg) !important; box-shadow: inset 3px 0 0 #dbab09; }
+/* Visual Diff Highlighting (Custom implementation) */
+.mkdiff-line-added { background-color: rgba(46, 160, 67, 0.1) !important; box-shadow: inset 3px 0 0 #2ea043; }
+.mkdiff-line-removed { background-color: rgba(248, 81, 73, 0.1) !important; box-shadow: inset 3px 0 0 #f85149; }
+.mkdiff-line-modified { background-color: rgba(219, 171, 9, 0.1) !important; box-shadow: inset 3px 0 0 #dbab09; }
 
-.mkdiff-w-add, .gh-add { background-color: var(--diff-add-word); }
-.mkdiff-w-del, .gh-del { background-color: var(--diff-del-word); text-decoration: line-through; }
+.mkdiff-w-add, .gh-add { background-color: rgba(46, 160, 67, 0.3) !important; }
+.mkdiff-w-del, .gh-del { background-color: rgba(248, 81, 73, 0.3) !important; text-decoration: line-through; }
 
-// 8. Diff (Diff2Html)
+/* Diff2Html Zone */
 .diff-zone {
+  width: 100%;
   border: 1px solid var(--palette-neutral-10, #ddd);
-  border-radius: 4px;
-  background: var(--background-color, #fff);
-  .d2h-file-wrapper { border: none; margin-bottom: 0; }
+  background: #fff;
 }
 
-// 9. Dark mode support
+/* Dark Mode Support */
 .theme-dark {
   .preview-pane, .diff-zone { background: #1a1a1a; }
-  .preview-header { background: #252525; }
+  .preview-header { background: #2a2a2a; }
+  .md-typeset { color: #d1d5db; }
+  .pr-md-preview__fileitem.is-selected { background: rgba(255,255,255,0.06); }
 }

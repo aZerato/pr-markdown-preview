@@ -57,19 +57,10 @@ const PrMarkdownPreview: React.FC = () => {
     const previewLeftRef = useRef<HTMLDivElement>(null);
     const previewRightRef = useRef<HTMLDivElement>(null);
 
-    // --- Helpers ---
     const azureAPIHelper = useMemo(() => new AzureAPIHelper(), []);
     const azurePrConfig = useMemo(() => new AzurePrConfig(), []);
 
-    // Initialisation Marked
-    useEffect(() => {
-        marked.use({ gfm: true, breaks: false });
-    }, []);
-
-    // --- Logique métier ---
-
-    const escapeHtml = (s: string) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
+    // --- Utilities ---
     const similarityTokens = (aTokens: string[], bTokens: string[]) => {
         if (!aTokens.length && !bTokens.length) return 1;
         const aSet = new Set(aTokens);
@@ -82,7 +73,7 @@ const PrMarkdownPreview: React.FC = () => {
     const isSimpleTextBlock = (el: HTMLElement) => {
         const tag = el.tagName.toLowerCase();
         const complexTags = ["ul", "ol", "table", "thead", "tbody", "tr", "pre", "code"];
-        if (complexTags.lastIndexOf(tag) !== -1) return false;
+        if (complexTags.indexOf(tag) !== -1) return false;
         return !Array.from(el.children).some(c => complexTags.indexOf(c.tagName.toLowerCase()) !== -1 || c.tagName.toLowerCase() === "img");
     };
 
@@ -174,56 +165,41 @@ const PrMarkdownPreview: React.FC = () => {
             if (c.added) iL += c.value.length; else if (c.removed) iR += c.value.length;
         });
     }, [viewMode, applyWordDiffToSimplePair]);
+    const escapeHtml = (s: string) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-    // --- Sync et Calculs ---
-
-    useEffect(() => {
-        const left = leftPaneRef.current;
-        const right = rightPaneRef.current;
-        if (!left || !right || viewMode !== "split") return;
-
-        let isSyncing = false;
-        const sync = (from: HTMLElement, to: HTMLElement) => {
-            if (isSyncing) return;
-            isSyncing = true;
-            const ratio = from.scrollTop / (from.scrollHeight - from.clientHeight || 1);
-            to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
-            requestAnimationFrame(() => isSyncing = false);
-        };
-        const hL = () => sync(left, right);
-        const hR = () => sync(right, left);
-        left.addEventListener("scroll", hL);
-        right.addEventListener("scroll", hR);
-        return () => { left.removeEventListener("scroll", hL); right.removeEventListener("scroll", hR); };
-    }, [viewMode, selectedPath]);
-
-    useEffect(() => {
-        if (selectedPath && viewMode === "split") requestAnimationFrame(applyDiffToPreviews);
-    }, [previewLeftHtml, previewRightHtml, viewMode, selectedPath, applyDiffToPreviews]);
-
+    // --- Core Logic: Diff Computation ---
     const computeAndSetDiff = useCallback(async (path: string, currentFiles?: MdFileItem[]) => {
         const list = currentFiles || files;
         const item = list.find(f => f.path === path);
         if (!item) return;
 
-        const leftHtml = DOMPurify.sanitize(await marked.parse(item.srcContent ?? ""), SANITIZE_CONFIG);
-        const rightHtml = DOMPurify.sanitize(await marked.parse(item.tgtContent ?? ""), SANITIZE_CONFIG);
+        setLoading(true);
+        try {
+            const leftRaw = await marked.parse(item.srcContent ?? "");
+            const rightRaw = await marked.parse(item.tgtContent ?? "");
+            
+            const patch = Diff.createTwoFilesPatch("old.md", "new.md", item.tgtContent ?? "", item.srcContent ?? "", "", "", { context: 3 });
+            const dHtmlRaw = Diff2Html.html(patch, { drawFileList: false, matching: "lines", outputFormat: viewMode === "split" ? "side-by-side" : "line-by-line" });
 
-        const patch = Diff.createTwoFilesPatch("before.md", "after.md", item.tgtContent ?? "", item.srcContent ?? "", "", "", { context: 3 });
-        const dHtml = Diff2Html.html(patch, { drawFileList: false, matching: "lines", outputFormat: viewMode === "split" ? "side-by-side" : "line-by-line" });
+            setPreviewLeftHtml(DOMPurify.sanitize(leftRaw, SANITIZE_CONFIG));
+            setPreviewRightHtml(DOMPurify.sanitize(rightRaw, SANITIZE_CONFIG));
+            setDiffHtml(DOMPurify.sanitize(dHtmlRaw, SANITIZE_CONFIG));
+            setSelectedPath(path);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }, [files, viewMode])
 
-        setPreviewLeftHtml(leftHtml);
-        setPreviewRightHtml(rightHtml);
-        setDiffHtml(DOMPurify.sanitize(dHtml, SANITIZE_CONFIG));
-        setSelectedPath(path);
-    }, [files, viewMode]);
-
-    // --- Load data ---
+    // --- Lifecycle: Data Loading ---
     useEffect(() => {
-        const load = async () => {
+        const initData = async () => 
+        {
             if (!loading) return;
 
-            try {
+            try 
+            {
                 await SDK.init();
                 const pageCtx = SDK.getPageContext();
                 
@@ -335,24 +311,50 @@ const PrMarkdownPreview: React.FC = () => {
                 
                 // --- Update final state ---
                 setFiles(sortedItems);
-                setLoading(false);
-                
                 if (sortedItems.length > 0) {
-                    // Call computeAndSetDiff for the first item to initialize the preview
-                    computeAndSetDiff(sortedItems[0].path, sortedItems);
+                    await computeAndSetDiff(sortedItems[0].path, sortedItems);
+                } else {
+                    setLoading(false);
                 }
-
             } catch (e: any) {
-                console.error("Error loading data:", e);
-                setError(e?.message ?? String(e));
+                setError(e.message);
                 setLoading(false);
             }
         };
+        initData();
+    }, []); // Run once
 
-        load();
-        // We want to run this effect only once on mount, even if we use functions from the closure (like computeAndSetDiff), because they are stable due to useCallback and we don't want to trigger reloads if they change.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    useEffect(() => {
+    if (selectedPath && (previewLeftHtml || previewRightHtml)) {
+        // We use requestAnimationFrame to ensure the DOM is actually rendered 
+        // by dangerouslySetInnerHTML before we try to modify its classes
+        requestAnimationFrame(() => {
+            applyDiffToPreviews();
+        });
+        }
+    }, [previewLeftHtml, previewRightHtml, viewMode, selectedPath, applyDiffToPreviews]);
+
+    // --- Scroll Sync Effect ---
+    useEffect(() => {
+        const left = leftPaneRef.current;
+        const right = rightPaneRef.current;
+        if (!left || !right || viewMode !== "split") return;
+
+        const handleScroll = (from: HTMLElement, to: HTMLElement) => {
+            const ratio = from.scrollTop / (from.scrollHeight - from.clientHeight || 1);
+            to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
+        };
+
+        const onLeft = () => handleScroll(left, right);
+        const onRight = () => handleScroll(right, left);
+
+        left.addEventListener("scroll", onLeft);
+        right.addEventListener("scroll", onRight);
+        return () => {
+            left.removeEventListener("scroll", onLeft);
+            right.removeEventListener("scroll", onRight);
+        };
+    }, [viewMode, selectedPath]);
 
     // --- Render ---
     return (
@@ -374,6 +376,11 @@ const PrMarkdownPreview: React.FC = () => {
                             <ul className="pr-md-preview__filelist">
                                 {files.map(f => (
                                     <li key={f.path} className={`pr-md-preview__fileitem ${f.path === selectedPath ? "is-selected" : ""}`} onClick={() => computeAndSetDiff(f.path)}>
+                                        {f.status && (
+                                          <span className={`status-badge status-${f.status.toLowerCase().split(',')[0].trim()}`}>
+                                              {f.status.split(',')[0].trim()}
+                                          </span>
+                                        )}
                                         <span className="path">{f.path}</span>
                                     </li>
                                 ))}
