@@ -11,6 +11,6 @@ Ajoute un onglet de comparaison des fichiers Markdown modifiés en mode Preview.
 
 ![Demo](img/mdcompare-demo.png)
 
-![Side By Side Edit](img/mdcompare-demo-edit.png)
+![Side By Side](img/mdcompare-demo2.png)
 
-![Inline Mode Edit](img/mdcompare-demo-inline.png)
+![Demo 2](img/mdcompare-demo3.png)
